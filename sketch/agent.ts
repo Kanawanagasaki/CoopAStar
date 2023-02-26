@@ -26,7 +26,10 @@ class Agent {
         }
     }
 
-    public CalculatePath() {
+    public CalculatePath(isCoop: boolean, storePath: boolean) {
+        if (isCoop && !this.CalculatePath(false, false))
+            return false;
+
         const dist = (a: Pos, b: Pos) => Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y);
 
         const startNode = new NodePos(this.Start, 0);
@@ -39,7 +42,7 @@ class Agent {
             openSet.sort((a, b) => a.F - b.F);
             let current = openSet.shift();
             if (current.X == this.Goal.X && current.Y == this.Goal.Y) {
-                while (current) {
+                while (storePath && current) {
                     this.Path.unshift(current);
                     current = current.PrevNode;
                 }
@@ -48,16 +51,39 @@ class Agent {
             const neighbors: Neighbor[] = [];
 
             const up = current.Up();
-            if (!this.Grid.IsWall(up)) neighbors.push(new Neighbor(up, 1.1));
+            if (!this.Grid.IsWall(up)) {
+                if (!isCoop)
+                    neighbors.push(new Neighbor(up, 1.1));
+                else if (!this.Grid.IsAgent(this, up, current.Step + 1, false))
+                    neighbors.push(new Neighbor(up, 1.1));
+            }
 
             const down = current.Down();
-            if (!this.Grid.IsWall(down)) neighbors.push(new Neighbor(down, 1.1));
+            if (!this.Grid.IsWall(down)) {
+                if (!isCoop)
+                    neighbors.push(new Neighbor(down, 1.1));
+                else if (!this.Grid.IsAgent(this, down, current.Step + 1, false))
+                    neighbors.push(new Neighbor(down, 1.1));
+            }
 
             const left = current.Left();
-            if (!this.Grid.IsWall(left)) neighbors.push(new Neighbor(left, 1.1));
+            if (!this.Grid.IsWall(left)) {
+                if (!isCoop)
+                    neighbors.push(new Neighbor(left, 1.1));
+                else if (!this.Grid.IsAgent(this, left, current.Step + 1, false))
+                    neighbors.push(new Neighbor(left, 1.1));
+            }
 
             const right = current.Right();
-            if (!this.Grid.IsWall(right)) neighbors.push(new Neighbor(right, 1.1));
+            if (!this.Grid.IsWall(right)) {
+                if (!isCoop)
+                    neighbors.push(new Neighbor(right, 1.1));
+                else if (!this.Grid.IsAgent(this, right, current.Step + 1, false))
+                    neighbors.push(new Neighbor(right, 1.1));
+            }
+
+            if (isCoop && !this.Grid.IsAgent(this, current, current.Step + 1, false))
+                neighbors.push(new Neighbor(current, 1));
 
             for (const neighbor of neighbors) {
                 const tentativeNode = new NodePos(neighbor, current.Step + 1);

@@ -16,9 +16,9 @@ var Agent = (function () {
                 this.NameHash = 0x7FFFFFFF + this.NameHash;
         }
     }
-    Agent.prototype.CalculatePath = function (type, storePath) {
+    Agent.prototype.CalculatePath = function (isCoop, storePath) {
         var _a;
-        if (type != PathfindingType.AStar && !this.CalculatePath(PathfindingType.AStar, false))
+        if (isCoop && !this.CalculatePath(false, false))
             return false;
         var dist = function (a, b) { return Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y); };
         var startNode = new NodePos(this.Start, 0);
@@ -39,33 +39,33 @@ var Agent = (function () {
             var neighbors = [];
             var up = current.Up();
             if (!this.Grid.IsWall(up)) {
-                if (type == PathfindingType.AStar)
+                if (!isCoop)
                     neighbors.push(new Neighbor(up, 1.1));
-                else if (!this.Grid.IsAgent(this, up, current.Step + 1, type == PathfindingType.CoopAStarIntersectionCheck))
+                else if (!this.Grid.IsAgent(this, up, current.Step + 1, false))
                     neighbors.push(new Neighbor(up, 1.1));
             }
             var down = current.Down();
             if (!this.Grid.IsWall(down)) {
-                if (type == PathfindingType.AStar)
+                if (!isCoop)
                     neighbors.push(new Neighbor(down, 1.1));
-                else if (!this.Grid.IsAgent(this, down, current.Step + 1, type == PathfindingType.CoopAStarIntersectionCheck))
+                else if (!this.Grid.IsAgent(this, down, current.Step + 1, false))
                     neighbors.push(new Neighbor(down, 1.1));
             }
             var left = current.Left();
             if (!this.Grid.IsWall(left)) {
-                if (type == PathfindingType.AStar)
+                if (!isCoop)
                     neighbors.push(new Neighbor(left, 1.1));
-                else if (!this.Grid.IsAgent(this, left, current.Step + 1, type == PathfindingType.CoopAStarIntersectionCheck))
+                else if (!this.Grid.IsAgent(this, left, current.Step + 1, false))
                     neighbors.push(new Neighbor(left, 1.1));
             }
             var right = current.Right();
             if (!this.Grid.IsWall(right)) {
-                if (type == PathfindingType.AStar)
+                if (!isCoop)
                     neighbors.push(new Neighbor(right, 1.1));
-                else if (!this.Grid.IsAgent(this, right, current.Step + 1, type == PathfindingType.CoopAStarIntersectionCheck))
+                else if (!this.Grid.IsAgent(this, right, current.Step + 1, false))
                     neighbors.push(new Neighbor(right, 1.1));
             }
-            if (type != PathfindingType.AStar && !this.Grid.IsAgent(this, current, current.Step + 1, type == PathfindingType.CoopAStarIntersectionCheck))
+            if (isCoop && !this.Grid.IsAgent(this, current, current.Step + 1, false))
                 neighbors.push(new Neighbor(current, 1));
             for (var _i = 0, neighbors_1 = neighbors; _i < neighbors_1.length; _i++) {
                 var neighbor = neighbors_1[_i];
@@ -168,7 +168,7 @@ var Grid = (function () {
         }
         for (var _b = 0, _c = this.Agents; _b < _c.length; _b++) {
             var agent = _c[_b];
-            agent.CalculatePath(PathfindingType.CoopAStarIntersectionCheck, true);
+            agent.CalculatePath(true, true);
         }
         this.Height = lines.length;
     }
@@ -237,12 +237,6 @@ var Grid = (function () {
     };
     return Grid;
 }());
-var PathfindingType;
-(function (PathfindingType) {
-    PathfindingType[PathfindingType["AStar"] = 0] = "AStar";
-    PathfindingType[PathfindingType["CoopAStar"] = 1] = "CoopAStar";
-    PathfindingType[PathfindingType["CoopAStarIntersectionCheck"] = 2] = "CoopAStarIntersectionCheck";
-})(PathfindingType || (PathfindingType = {}));
 var Pos = (function () {
     function Pos(x, y) {
         this.X = x;
