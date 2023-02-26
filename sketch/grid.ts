@@ -41,7 +41,7 @@ class Grid {
                 agent.Goal = agent.Start;
 
         for (const agent of this.Agents)
-            agent.CalculatePath(true, true);
+            agent.CalculatePath();
 
         this.Height = lines.length;
     }

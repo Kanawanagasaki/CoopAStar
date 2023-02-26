@@ -17,7 +17,7 @@ const INIT_STATE =
 #..h..g#..j..#
 ########.###.#
 ##.####i.K#k.#
-#m..lM######I#
+#m.lLM######I#
 ##############
 `;
 const ROOT_GRID = new Grid(INIT_STATE);

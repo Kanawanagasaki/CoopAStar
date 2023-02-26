@@ -16,21 +16,24 @@ var Agent = (function () {
                 this.NameHash = 0x7FFFFFFF + this.NameHash;
         }
     }
-    Agent.prototype.CalculatePath = function (isCoop, storePath) {
+    Agent.prototype.CalculatePath = function () {
         var _a;
-        if (isCoop && !this.CalculatePath(false, false))
-            return false;
-        var dist = function (a, b) { return Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y); };
+        var _b, _c, _d, _e;
+        var goalNode = new NodePos(this.Goal, 0);
+        goalNode.G = 0;
+        goalNode.H = this.Manhattan(this.Goal, this.Start);
+        this._rrasOpenSet = [goalNode];
+        this._rrasClosedSet = {};
         var startNode = new NodePos(this.Start, 0);
         startNode.G = 0;
-        startNode.H = dist(this.Start, this.Goal);
+        startNode.H = (_c = (_b = this.CalculateRRAS(startNode)) === null || _b === void 0 ? void 0 : _b.F) !== null && _c !== void 0 ? _c : Number.POSITIVE_INFINITY;
         var openSet = [startNode];
-        var visited = (_a = {}, _a[startNode.GetNodeKey()] = startNode, _a);
+        var closedSet = (_a = {}, _a[startNode.GetNodeKey()] = startNode, _a);
         for (var z = 0; z < 1000 && openSet.length > 0; z++) {
             openSet.sort(function (a, b) { return a.F - b.F; });
             var current = openSet.shift();
             if (current.X == this.Goal.X && current.Y == this.Goal.Y) {
-                while (storePath && current) {
+                while (current) {
                     this.Path.unshift(current);
                     current = current.PrevNode;
                 }
@@ -38,52 +41,79 @@ var Agent = (function () {
             }
             var neighbors = [];
             var up = current.Up();
-            if (!this.Grid.IsWall(up)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(up, 1.1));
-                else if (!this.Grid.IsAgent(this, up, current.Step + 1, true))
-                    neighbors.push(new Neighbor(up, 1.1));
-            }
+            if (!this.Grid.IsWall(up) && !this.Grid.IsAgent(this, up, current.Step + 1, true))
+                neighbors.push(new Neighbor(up, 1.1));
             var down = current.Down();
-            if (!this.Grid.IsWall(down)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(down, 1.1));
-                else if (!this.Grid.IsAgent(this, down, current.Step + 1, true))
-                    neighbors.push(new Neighbor(down, 1.1));
-            }
+            if (!this.Grid.IsWall(down) && !this.Grid.IsAgent(this, down, current.Step + 1, true))
+                neighbors.push(new Neighbor(down, 1.1));
             var left = current.Left();
-            if (!this.Grid.IsWall(left)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(left, 1.1));
-                else if (!this.Grid.IsAgent(this, left, current.Step + 1, true))
-                    neighbors.push(new Neighbor(left, 1.1));
-            }
+            if (!this.Grid.IsWall(left) && !this.Grid.IsAgent(this, left, current.Step + 1, true))
+                neighbors.push(new Neighbor(left, 1.1));
             var right = current.Right();
-            if (!this.Grid.IsWall(right)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(right, 1.1));
-                else if (!this.Grid.IsAgent(this, right, current.Step + 1, true))
-                    neighbors.push(new Neighbor(right, 1.1));
-            }
-            if (isCoop && !this.Grid.IsAgent(this, current, current.Step + 1, true))
+            if (!this.Grid.IsWall(right) && !this.Grid.IsAgent(this, right, current.Step + 1, true))
+                neighbors.push(new Neighbor(right, 1.1));
+            if (!this.Grid.IsAgent(this, current, current.Step + 1, true))
                 neighbors.push(new Neighbor(current, 1));
             for (var _i = 0, neighbors_1 = neighbors; _i < neighbors_1.length; _i++) {
                 var neighbor = neighbors_1[_i];
                 var tentativeNode = new NodePos(neighbor, current.Step + 1);
                 tentativeNode.G = current.G + neighbor.Score;
                 var nodeKey = tentativeNode.GetNodeKey();
-                if (!(nodeKey in visited) || tentativeNode.G < visited[nodeKey].G) {
+                if (!(nodeKey in closedSet) || tentativeNode.G < closedSet[nodeKey].G) {
                     tentativeNode.PrevNode = current;
-                    tentativeNode.H = dist(tentativeNode, this.Goal);
+                    tentativeNode.H = (_e = (_d = this.CalculateRRAS(tentativeNode)) === null || _d === void 0 ? void 0 : _d.F) !== null && _e !== void 0 ? _e : Number.POSITIVE_INFINITY;
                     for (var i = 0; i < openSet.length; i++)
                         if (openSet[i].Equals(tentativeNode) && openSet[i].Step == tentativeNode.Step)
                             openSet.splice(i, 1);
                     openSet.push(tentativeNode);
-                    visited[nodeKey] = tentativeNode;
+                    closedSet[nodeKey] = tentativeNode;
                 }
             }
         }
         return false;
+    };
+    Agent.prototype.CalculateRRAS = function (N) {
+        var posKey = N.GetNodeKey();
+        if (this._rrasClosedSet.hasOwnProperty(posKey))
+            return this._rrasClosedSet[posKey];
+        while (this._rrasOpenSet.length > 0) {
+            this._rrasOpenSet.sort(function (a, b) { return a.F - b.F; });
+            var current = this._rrasOpenSet.shift();
+            if (current.X == N.X && current.Y == N.Y)
+                return current;
+            var neighbors = [];
+            var up = current.Up();
+            if (!this.Grid.IsWall(up))
+                neighbors.push(new Neighbor(up, 1.1));
+            var down = current.Down();
+            if (!this.Grid.IsWall(down))
+                neighbors.push(new Neighbor(down, 1.1));
+            var left = current.Left();
+            if (!this.Grid.IsWall(left))
+                neighbors.push(new Neighbor(left, 1.1));
+            var right = current.Right();
+            if (!this.Grid.IsWall(right))
+                neighbors.push(new Neighbor(right, 1.1));
+            for (var _i = 0, neighbors_2 = neighbors; _i < neighbors_2.length; _i++) {
+                var neighbor = neighbors_2[_i];
+                var tentativeNode = new NodePos(neighbor, current.Step + 1);
+                tentativeNode.G = current.G + neighbor.Score;
+                var nodeKey = tentativeNode.GetNodeKey();
+                if (!(nodeKey in this._rrasClosedSet) || tentativeNode.G < this._rrasClosedSet[nodeKey].G) {
+                    tentativeNode.PrevNode = current;
+                    tentativeNode.H = this.Manhattan(tentativeNode, this.Start);
+                    for (var i = 0; i < this._rrasOpenSet.length; i++)
+                        if (this._rrasOpenSet[i].Equals(tentativeNode))
+                            this._rrasOpenSet.splice(i, 1);
+                    this._rrasOpenSet.push(tentativeNode);
+                    this._rrasClosedSet[nodeKey] = tentativeNode;
+                }
+            }
+        }
+        return null;
+    };
+    Agent.prototype.Manhattan = function (a, b) {
+        return Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y);
     };
     Agent.prototype.OnMouseClick = function (cellX, cellY) {
         if (this.Start.X == cellX && this.Start.Y == cellY)
@@ -168,7 +198,7 @@ var Grid = (function () {
         }
         for (var _b = 0, _c = this.Agents; _b < _c.length; _b++) {
             var agent = _c[_b];
-            agent.CalculatePath(true, true);
+            agent.CalculatePath();
         }
         this.Height = lines.length;
     }
@@ -302,7 +332,7 @@ var Neighbor = (function (_super) {
     }
     return Neighbor;
 }(Pos));
-var INIT_STATE = "\n##############\n#B....d##A####\n###..###c...a#\n#....######C##\n#D#...b#######\n#########.####\n#...G#eF...Ef#\n#.H###########\n#..h..g#..j..#\n########.###.#\n##.####i.K#k.#\n#m..lM######I#\n##############\n";
+var INIT_STATE = "\n##############\n#B....d##A####\n###..###c...a#\n#....######C##\n#D#...b#######\n#########.####\n#...G#eF...Ef#\n#.H###########\n#..h..g#..j..#\n########.###.#\n##.####i.K#k.#\n#m.lLM######I#\n##############\n";
 var ROOT_GRID = new Grid(INIT_STATE);
 var RENDERER;
 var TIME_SLIDER;
