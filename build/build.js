@@ -41,31 +41,31 @@ var Agent = (function () {
             if (!this.Grid.IsWall(up)) {
                 if (!isCoop)
                     neighbors.push(new Neighbor(up, 1.1));
-                else if (!this.Grid.IsAgent(this, up, current.Step + 1, false))
+                else if (!this.Grid.IsAgent(this, up, current.Step + 1, true))
                     neighbors.push(new Neighbor(up, 1.1));
             }
             var down = current.Down();
             if (!this.Grid.IsWall(down)) {
                 if (!isCoop)
                     neighbors.push(new Neighbor(down, 1.1));
-                else if (!this.Grid.IsAgent(this, down, current.Step + 1, false))
+                else if (!this.Grid.IsAgent(this, down, current.Step + 1, true))
                     neighbors.push(new Neighbor(down, 1.1));
             }
             var left = current.Left();
             if (!this.Grid.IsWall(left)) {
                 if (!isCoop)
                     neighbors.push(new Neighbor(left, 1.1));
-                else if (!this.Grid.IsAgent(this, left, current.Step + 1, false))
+                else if (!this.Grid.IsAgent(this, left, current.Step + 1, true))
                     neighbors.push(new Neighbor(left, 1.1));
             }
             var right = current.Right();
             if (!this.Grid.IsWall(right)) {
                 if (!isCoop)
                     neighbors.push(new Neighbor(right, 1.1));
-                else if (!this.Grid.IsAgent(this, right, current.Step + 1, false))
+                else if (!this.Grid.IsAgent(this, right, current.Step + 1, true))
                     neighbors.push(new Neighbor(right, 1.1));
             }
-            if (isCoop && !this.Grid.IsAgent(this, current, current.Step + 1, false))
+            if (isCoop && !this.Grid.IsAgent(this, current, current.Step + 1, true))
                 neighbors.push(new Neighbor(current, 1));
             for (var _i = 0, neighbors_1 = neighbors; _i < neighbors_1.length; _i++) {
                 var neighbor = neighbors_1[_i];
