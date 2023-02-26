@@ -67,7 +67,7 @@ class Agent {
                     tentativeNode.PrevNode = current;
                     tentativeNode.H = dist(tentativeNode, this.Goal);
                     for (let i = 0; i < openSet.length; i++)
-                        if (openSet[i].Equals(tentativeNode) && openSet[i].Step == tentativeNode.Step)
+                        if (openSet[i].Equals(tentativeNode))
                             openSet.splice(i, 1);
                     openSet.push(tentativeNode);
                     visited[nodeKey] = tentativeNode;
