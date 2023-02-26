@@ -302,7 +302,7 @@ var Neighbor = (function (_super) {
     }
     return Neighbor;
 }(Pos));
-var INIT_STATE = "\n##############\n#B....d##A####\n###..###c...a#\n#....######C##\n#D#...b#######\n#########.####\n#...G#eF...Ef#\n#.H###########\n#..h..g#..j..#\n########.###.#\n##.####i.K#k.#\n#m..lM######I#\n##############\n";
+var INIT_STATE = "\n##############\n#B....d##A####\n###..###c...a#\n#....######C##\n#D#...b#######\n#########.####\n#...G#eF...Ef#\n#.H###########\n#..h..g#..j..#\n########.###.#\n##.####i.K#k.#\n#m.lLM######I#\n##############\n";
 var ROOT_GRID = new Grid(INIT_STATE);
 var RENDERER;
 var TIME_SLIDER;
