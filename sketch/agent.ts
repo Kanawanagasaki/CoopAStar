@@ -5,6 +5,10 @@ class Agent {
     public readonly Start: Pos;
     public Goal: Pos | undefined;
 
+    public IsFinished: boolean;
+    public FinishStep: number;
+    public LastMoveStep: number;
+
     public Path: Pos[] = [];
 
     private _isTracked: boolean = false;
@@ -36,11 +40,12 @@ class Agent {
         startNode.G = 0;
         startNode.H = dist(this.Start, this.Goal);
         const openSet: NodePos[] = [startNode];
-        const visited: Record<string, NodePos> = { [startNode.GetNodeKey()]: startNode };
+        const closedSet: Record<string, NodePos> = {};
 
         for (let z = 0; z < 1000 && openSet.length > 0; z++) {
             openSet.sort((a, b) => a.F - b.F);
             let current = openSet.shift();
+            closedSet[isCoop ? current.GetNodeKey() : current.GetKey()] = current;
             if (current.X == this.Goal.X && current.Y == this.Goal.Y) {
                 while (storePath && current) {
                     this.Path.unshift(current);
@@ -48,60 +53,57 @@ class Agent {
                 }
                 return true;
             }
-            const neighbors: Neighbor[] = [];
-
-            const up = current.Up();
-            if (!this.Grid.IsWall(up)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(up, 1.1));
-                else if (!this.Grid.IsAgent(this, up, current.Step + 1, false))
-                    neighbors.push(new Neighbor(up, 1.1));
-            }
-
-            const down = current.Down();
-            if (!this.Grid.IsWall(down)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(down, 1.1));
-                else if (!this.Grid.IsAgent(this, down, current.Step + 1, false))
-                    neighbors.push(new Neighbor(down, 1.1));
-            }
-
-            const left = current.Left();
-            if (!this.Grid.IsWall(left)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(left, 1.1));
-                else if (!this.Grid.IsAgent(this, left, current.Step + 1, false))
-                    neighbors.push(new Neighbor(left, 1.1));
-            }
-
-            const right = current.Right();
-            if (!this.Grid.IsWall(right)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(right, 1.1));
-                else if (!this.Grid.IsAgent(this, right, current.Step + 1, false))
-                    neighbors.push(new Neighbor(right, 1.1));
+            const neighborNodes: Neighbor[] = [];
+            for (const neighbor of current.Neighbors()) {
+                if (!this.Grid.IsWall(neighbor)) {
+                    if (!isCoop)
+                        neighborNodes.push(new Neighbor(neighbor, 1.1));
+                    else if (!this.Grid.IsAgent(this, neighbor, current.Step + 1, false))
+                        neighborNodes.push(new Neighbor(neighbor, 1.1));
+                }
             }
 
             if (isCoop && !this.Grid.IsAgent(this, current, current.Step + 1, false))
-                neighbors.push(new Neighbor(current, 1));
+                neighborNodes.push(new Neighbor(current, 1));
 
-            for (const neighbor of neighbors) {
+            for (const neighbor of neighborNodes) {
                 const tentativeNode = new NodePos(neighbor, current.Step + 1);
                 tentativeNode.G = current.G + neighbor.Score;
-                const nodeKey = tentativeNode.GetNodeKey();
-                if (!(nodeKey in visited) || tentativeNode.G < visited[nodeKey].G) {
+                const nodeKey = isCoop ? tentativeNode.GetNodeKey() : tentativeNode.GetKey();
+                if (!(nodeKey in closedSet) || tentativeNode.G < closedSet[nodeKey].G) {
                     tentativeNode.PrevNode = current;
                     tentativeNode.H = dist(tentativeNode, this.Goal);
-                    for (let i = 0; i < openSet.length; i++)
-                        if (openSet[i].Equals(tentativeNode) && openSet[i].Step == tentativeNode.Step)
-                            openSet.splice(i, 1);
-                    openSet.push(tentativeNode);
-                    visited[nodeKey] = tentativeNode;
+                    closedSet[nodeKey] = tentativeNode;
+                    if (!openSet.some(x => x.Equals(tentativeNode) && (x.Step == tentativeNode.Step || !isCoop)))
+                        openSet.push(tentativeNode);
                 }
             }
         }
 
         return false;
+    }
+
+    public Summarize() {
+        this.FinishStep = 0;
+        this.IsFinished = false;
+        this.LastMoveStep = 0;
+
+        if (this.Path.length > 0) {
+            const lastPos = this.Path[this.Path.length - 1];
+            this.IsFinished = lastPos.Equals(this.Goal);
+            for (let i = this.Path.length - 1; i >= 0; i--) {
+                if (!this.Path[i].Equals(this.Goal)) {
+                    this.FinishStep = i + 1;
+                    break;
+                }
+            }
+            for (let i = this.Path.length - 1; i >= 0; i--) {
+                if (!this.Path[i].Equals(lastPos)) {
+                    this.LastMoveStep = i + 1;
+                    break;
+                }
+            }
+        }
     }
 
     public OnMouseClick(cellX: number, cellY: number) {

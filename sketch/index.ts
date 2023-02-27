@@ -23,6 +23,7 @@ const INIT_STATE =
 const ROOT_GRID = new Grid(INIT_STATE);
 let RENDERER: p5.Renderer;
 let TIME_SLIDER: p5.Element;
+let CANVAS_SIZE: number = 0;
 
 function setup() {
     RENDERER = createCanvas(windowWidth, windowHeight);
@@ -37,15 +38,15 @@ function windowResized() {
 }
 
 function calculateSizes() {
-    const canvasSize = Math.min(windowWidth - 20, windowHeight - 50);
-    const cellSize = Math.min(canvasSize / ROOT_GRID.Width, canvasSize / ROOT_GRID.Height);
+    CANVAS_SIZE = Math.min(windowWidth - 20, windowHeight - 70);
+    const cellSize = Math.min(CANVAS_SIZE / ROOT_GRID.Width, CANVAS_SIZE / ROOT_GRID.Height);
     ROOT_GRID.CellWidth = cellSize;
     ROOT_GRID.CellHeight = cellSize;
-    ROOT_GRID.PosX = windowWidth / 2 - canvasSize / 2;
-    ROOT_GRID.PosY = (windowHeight - 30) / 2 - canvasSize / 2;
+    ROOT_GRID.PosX = windowWidth / 2 - CANVAS_SIZE / 2;
+    ROOT_GRID.PosY = (windowHeight - 50) / 2 - CANVAS_SIZE / 2;
 
-    TIME_SLIDER.position(ROOT_GRID.PosX, ROOT_GRID.PosY + canvasSize + 10);
-    TIME_SLIDER.style("width", `${canvasSize}px`);
+    TIME_SLIDER.position(ROOT_GRID.PosX, ROOT_GRID.PosY + CANVAS_SIZE + 30);
+    TIME_SLIDER.style("width", `${CANVAS_SIZE}px`);
 }
 
 function mouseClicked() {
