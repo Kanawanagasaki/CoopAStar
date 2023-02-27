@@ -22,8 +22,12 @@ class Pos {
     public Left() {
         return new Pos(this.X - 1, this.Y);
     }
-    
+
     public Right() {
         return new Pos(this.X + 1, this.Y);
+    }
+
+    public Neighbors() {
+        return [this.Up(), this.Down(), this.Left(), this.Right()];
     }
 }

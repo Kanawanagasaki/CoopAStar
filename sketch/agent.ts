@@ -5,9 +5,15 @@ class Agent {
     public readonly Start: Pos;
     public Goal: Pos | undefined;
 
+    public IsFinished: boolean;
+    public FinishStep: number;
+    public LastMoveStep: number;
+
     public Path: Pos[] = [];
 
     private _isTracked: boolean = false;
+    private _openSet: NodePos[];
+    private _closedSet: Record<string, NodePos>;
 
     public constructor(grid: Grid, name: string, startX: number, startY: number) {
         this.Grid = grid;
@@ -29,48 +35,40 @@ class Agent {
     public CalculatePath() {
         const dist = (a: Pos, b: Pos) => Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y);
 
-        const startNode = new NodePos(this.Start, 0);
+        const startNode = new NodePos(this.Start);
         startNode.G = 0;
         startNode.H = dist(this.Start, this.Goal);
-        const openSet: NodePos[] = [startNode];
-        const visited: Record<string, NodePos> = { [startNode.GetNodeKey()]: startNode };
+        this._openSet = [startNode];
+        this._closedSet = {};
 
-        for (let z = 0; z < 1000 && openSet.length > 0; z++) {
-            openSet.sort((a, b) => a.F - b.F);
-            let current = openSet.shift();
+        for (let z = 0; z < 1000 && this._openSet.length > 0; z++) {
+            this._openSet.sort((a, b) => a.F - b.F);
+            let current = this._openSet.shift();
+            this._closedSet[current.GetNodeKey()] = current;
             if (current.X == this.Goal.X && current.Y == this.Goal.Y) {
                 while (current) {
                     this.Path.unshift(current);
                     current = current.PrevNode;
                 }
+                console.log(this._closedSet);
                 return true;
             }
+
             const neighbors: Neighbor[] = [];
-
-            const up = current.Up();
-            if (!this.Grid.IsWall(up)) neighbors.push(new Neighbor(up, 1.1));
-
-            const down = current.Down();
-            if (!this.Grid.IsWall(down)) neighbors.push(new Neighbor(down, 1.1));
-
-            const left = current.Left();
-            if (!this.Grid.IsWall(left)) neighbors.push(new Neighbor(left, 1.1));
-
-            const right = current.Right();
-            if (!this.Grid.IsWall(right)) neighbors.push(new Neighbor(right, 1.1));
+            for (const neighbor of current.Neighbors())
+                if (!this.Grid.IsWall(neighbor))
+                    neighbors.push(new Neighbor(neighbor, 1));
 
             for (const neighbor of neighbors) {
-                const tentativeNode = new NodePos(neighbor, current.Step + 1);
+                const tentativeNode = new NodePos(neighbor);
                 tentativeNode.G = current.G + neighbor.Score;
                 const nodeKey = tentativeNode.GetNodeKey();
-                if (!(nodeKey in visited) || tentativeNode.G < visited[nodeKey].G) {
+                if (!(nodeKey in this._closedSet) || tentativeNode.G < this._closedSet[nodeKey].G) {
                     tentativeNode.PrevNode = current;
                     tentativeNode.H = dist(tentativeNode, this.Goal);
-                    for (let i = 0; i < openSet.length; i++)
-                        if (openSet[i].Equals(tentativeNode))
-                            openSet.splice(i, 1);
-                    openSet.push(tentativeNode);
-                    visited[nodeKey] = tentativeNode;
+                    this._closedSet[nodeKey] = tentativeNode;
+                    if (!this._openSet.some(x => x.Equals(tentativeNode)))
+                        this._openSet.push(tentativeNode);
                 }
             }
         }
@@ -78,9 +76,31 @@ class Agent {
         return false;
     }
 
+    public Summarize() {
+        this.FinishStep = 0;
+        this.IsFinished = false;
+        this.LastMoveStep = 0;
+
+        if (this.Path.length > 0) {
+            const lastPos = this.Path[this.Path.length - 1];
+            this.IsFinished = lastPos.Equals(this.Goal);
+            for (let i = this.Path.length - 1; i >= 0; i--) {
+                if (!this.Path[i].Equals(this.Goal)) {
+                    this.FinishStep = i + 1;
+                    break;
+                }
+            }
+            for (let i = this.Path.length - 1; i >= 0; i--) {
+                if (!this.Path[i].Equals(lastPos)) {
+                    this.LastMoveStep = i + 1;
+                    break;
+                }
+            }
+        }
+    }
+
     public OnMouseClick(cellX: number, cellY: number) {
-        if (this.Start.X == cellX && this.Start.Y == cellY)
-            this._isTracked = !this._isTracked;
+        this._isTracked = this.Start.X == cellX && this.Start.Y == cellY;
     }
 
     public OnMouseMove(cellX: number, cellY: number) {
@@ -106,6 +126,17 @@ class Agent {
                         pos2.X * cellWidth + cellWidth / 2,
                         pos2.Y * cellHeight + cellHeight / 2
                     );
+            }
+            for (const node of Object.values(this._closedSet)) {
+                push();
+                strokeWeight(1);
+                textAlign("left", "top");
+                text(Math.floor(node.G * 100) / 100, node.X * cellWidth + 6, node.Y * cellHeight + 6);
+                textAlign("left", "bottom");
+                text(Math.floor(node.H * 100) / 100, node.X * cellWidth + 6, node.Y * cellHeight + cellHeight - 6);
+                textAlign("right", "bottom");
+                text(Math.floor(node.F * 100) / 100, node.X * cellWidth + cellWidth - 6, node.Y * cellHeight + cellHeight - 6);
+                pop();
             }
         }
 

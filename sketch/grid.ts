@@ -35,6 +35,7 @@ class Grid {
             }
             this.Width = Math.max(this.Width, chs.length);
         }
+        this.Height = lines.length;
 
         for (const agent of this.Agents)
             if (!agent.Goal)
@@ -43,7 +44,9 @@ class Grid {
         for (const agent of this.Agents)
             agent.CalculatePath();
 
-        this.Height = lines.length;
+            
+        for (const agent of this.Agents)
+            agent.Summarize();
     }
 
     public IsWall(pos: Pos) {
@@ -105,9 +108,18 @@ class Grid {
             }
         }
 
-        const longestPath = Math.max(...this.Agents.map(x => x.Path.length));
+        const longestPath = Math.max(...this.Agents.map(x => x.LastMoveStep));
         for (const agent of this.Agents)
-            agent.Render(this.CellWidth, this.CellHeight, percent * (longestPath - 1));
+            agent.Render(this.CellWidth, this.CellHeight, percent * longestPath);
+
+        push();
+        strokeWeight(1);
+        textAlign("left", "top");
+        textSize(16);
+        noStroke();
+        fill(255, 255, 255);
+        text("Step: " + Math.round(percent * longestPath), 0, CANVAS_SIZE + 10);
+        pop();
 
         pop();
     }
