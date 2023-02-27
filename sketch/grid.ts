@@ -118,8 +118,6 @@ class Grid {
         strokeWeight(1);
         textAlign("left", "top");
         textSize(16);
-        // stroke(255, 255, 255);
-        // noFill();
         noStroke();
         fill(255, 255, 255);
         text("Step: " + Math.round(percent * longestPath), 0, CANVAS_SIZE + 10);
