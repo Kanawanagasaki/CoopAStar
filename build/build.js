@@ -17,7 +17,6 @@ var Agent = (function () {
         }
     }
     Agent.prototype.CalculatePath = function (isCoop, storePath) {
-        var _a;
         if (isCoop && !this.CalculatePath(false, false))
             return false;
         var dist = function (a, b) { return Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y); };
@@ -25,10 +24,11 @@ var Agent = (function () {
         startNode.G = 0;
         startNode.H = dist(this.Start, this.Goal);
         var openSet = [startNode];
-        var visited = (_a = {}, _a[startNode.GetNodeKey()] = startNode, _a);
+        var closedSet = {};
         for (var z = 0; z < 1000 && openSet.length > 0; z++) {
             openSet.sort(function (a, b) { return a.F - b.F; });
             var current = openSet.shift();
+            closedSet[isCoop ? current.GetNodeKey() : current.GetKey()] = current;
             if (current.X == this.Goal.X && current.Y == this.Goal.Y) {
                 while (storePath && current) {
                     this.Path.unshift(current);
@@ -36,54 +36,58 @@ var Agent = (function () {
                 }
                 return true;
             }
-            var neighbors = [];
-            var up = current.Up();
-            if (!this.Grid.IsWall(up)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(up, 1.1));
-                else if (!this.Grid.IsAgent(this, up, current.Step + 1, true))
-                    neighbors.push(new Neighbor(up, 1.1));
-            }
-            var down = current.Down();
-            if (!this.Grid.IsWall(down)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(down, 1.1));
-                else if (!this.Grid.IsAgent(this, down, current.Step + 1, true))
-                    neighbors.push(new Neighbor(down, 1.1));
-            }
-            var left = current.Left();
-            if (!this.Grid.IsWall(left)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(left, 1.1));
-                else if (!this.Grid.IsAgent(this, left, current.Step + 1, true))
-                    neighbors.push(new Neighbor(left, 1.1));
-            }
-            var right = current.Right();
-            if (!this.Grid.IsWall(right)) {
-                if (!isCoop)
-                    neighbors.push(new Neighbor(right, 1.1));
-                else if (!this.Grid.IsAgent(this, right, current.Step + 1, true))
-                    neighbors.push(new Neighbor(right, 1.1));
+            var neighborNodes = [];
+            for (var _i = 0, _a = current.Neighbors(); _i < _a.length; _i++) {
+                var neighbor = _a[_i];
+                if (!this.Grid.IsWall(neighbor)) {
+                    if (!isCoop)
+                        neighborNodes.push(new Neighbor(neighbor, 1.1));
+                    else if (!this.Grid.IsAgent(this, neighbor, current.Step + 1, true))
+                        neighborNodes.push(new Neighbor(neighbor, 1.1));
+                }
             }
             if (isCoop && !this.Grid.IsAgent(this, current, current.Step + 1, true))
-                neighbors.push(new Neighbor(current, 1));
-            for (var _i = 0, neighbors_1 = neighbors; _i < neighbors_1.length; _i++) {
-                var neighbor = neighbors_1[_i];
+                neighborNodes.push(new Neighbor(current, 1));
+            var _loop_1 = function (neighbor) {
                 var tentativeNode = new NodePos(neighbor, current.Step + 1);
                 tentativeNode.G = current.G + neighbor.Score;
-                var nodeKey = tentativeNode.GetNodeKey();
-                if (!(nodeKey in visited) || tentativeNode.G < visited[nodeKey].G) {
+                var nodeKey = isCoop ? tentativeNode.GetNodeKey() : tentativeNode.GetKey();
+                if (!(nodeKey in closedSet) || tentativeNode.G < closedSet[nodeKey].G) {
                     tentativeNode.PrevNode = current;
-                    tentativeNode.H = dist(tentativeNode, this.Goal);
-                    for (var i = 0; i < openSet.length; i++)
-                        if (openSet[i].Equals(tentativeNode) && openSet[i].Step == tentativeNode.Step)
-                            openSet.splice(i, 1);
-                    openSet.push(tentativeNode);
-                    visited[nodeKey] = tentativeNode;
+                    tentativeNode.H = dist(tentativeNode, this_1.Goal);
+                    closedSet[nodeKey] = tentativeNode;
+                    if (!openSet.some(function (x) { return x.Equals(tentativeNode) && (x.Step == tentativeNode.Step || !isCoop); }))
+                        openSet.push(tentativeNode);
                 }
+            };
+            var this_1 = this;
+            for (var _b = 0, neighborNodes_1 = neighborNodes; _b < neighborNodes_1.length; _b++) {
+                var neighbor = neighborNodes_1[_b];
+                _loop_1(neighbor);
             }
         }
         return false;
+    };
+    Agent.prototype.Summarize = function () {
+        this.FinishStep = 0;
+        this.IsFinished = false;
+        this.LastMoveStep = 0;
+        if (this.Path.length > 0) {
+            var lastPos = this.Path[this.Path.length - 1];
+            this.IsFinished = lastPos.Equals(this.Goal);
+            for (var i = this.Path.length - 1; i >= 0; i--) {
+                if (!this.Path[i].Equals(this.Goal)) {
+                    this.FinishStep = i + 1;
+                    break;
+                }
+            }
+            for (var i = this.Path.length - 1; i >= 0; i--) {
+                if (!this.Path[i].Equals(lastPos)) {
+                    this.LastMoveStep = i + 1;
+                    break;
+                }
+            }
+        }
     };
     Agent.prototype.OnMouseClick = function (cellX, cellY) {
         if (this.Start.X == cellX && this.Start.Y == cellY)
@@ -138,26 +142,26 @@ var Grid = (function () {
         for (var iy = 0; iy < lines.length; iy++) {
             this[iy] = [];
             var chs = lines[iy].split("");
-            var _loop_1 = function (ix) {
-                this_1[iy][ix] = chs[ix] != "#";
+            var _loop_2 = function (ix) {
+                this_2[iy][ix] = chs[ix] != "#";
                 if (/[a-z]/.test(chs[ix])) {
-                    var agent = new Agent(this_1, chs[ix], ix, iy);
+                    var agent = new Agent(this_2, chs[ix], ix, iy);
                     if (chs[ix] in goals)
                         agent.Goal = goals[chs[ix]];
-                    this_1.Agents.push(agent);
+                    this_2.Agents.push(agent);
                 }
                 else if (/[A-Z]/.test(chs[ix])) {
                     var name_1 = chs[ix].toLowerCase();
-                    var agent = this_1.Agents.filter(function (x) { return x.Name == name_1; })[0];
+                    var agent = this_2.Agents.filter(function (x) { return x.Name == name_1; })[0];
                     if (agent)
                         agent.Goal = new Pos(ix, iy);
                     else
                         goals[name_1] = new Pos(ix, iy);
                 }
             };
-            var this_1 = this;
+            var this_2 = this;
             for (var ix = 0; ix < chs.length; ix++) {
-                _loop_1(ix);
+                _loop_2(ix);
             }
             this.Width = Math.max(this.Width, chs.length);
         }
@@ -169,6 +173,10 @@ var Grid = (function () {
         for (var _b = 0, _c = this.Agents; _b < _c.length; _b++) {
             var agent = _c[_b];
             agent.CalculatePath(true, true);
+        }
+        for (var _d = 0, _e = this.Agents; _d < _e.length; _d++) {
+            var agent = _e[_d];
+            agent.Summarize();
         }
         this.Height = lines.length;
     }
@@ -228,11 +236,19 @@ var Grid = (function () {
                 rect(ix * this.CellWidth, iy * this.CellHeight, this.CellWidth, this.CellHeight);
             }
         }
-        var longestPath = Math.max.apply(Math, this.Agents.map(function (x) { return x.Path.length; }));
+        var longestPath = Math.max.apply(Math, this.Agents.map(function (x) { return x.LastMoveStep; }));
         for (var _i = 0, _a = this.Agents; _i < _a.length; _i++) {
             var agent = _a[_i];
-            agent.Render(this.CellWidth, this.CellHeight, percent * (longestPath - 1));
+            agent.Render(this.CellWidth, this.CellHeight, percent * longestPath);
         }
+        push();
+        strokeWeight(1);
+        textAlign("left", "top");
+        textSize(16);
+        noStroke();
+        fill(255, 255, 255);
+        text("Step: " + Math.round(percent * longestPath), 0, CANVAS_SIZE + 10);
+        pop();
         pop();
     };
     return Grid;
@@ -245,6 +261,9 @@ var Pos = (function () {
     Pos.prototype.Equals = function (pos) {
         return this.X == pos.X && this.Y == pos.Y;
     };
+    Pos.prototype.Neighbors = function () {
+        return [this.Up(), this.Down(), this.Left(), this.Right()];
+    };
     Pos.prototype.Up = function () {
         return new Pos(this.X, this.Y - 1);
     };
@@ -256,6 +275,9 @@ var Pos = (function () {
     };
     Pos.prototype.Right = function () {
         return new Pos(this.X + 1, this.Y);
+    };
+    Pos.prototype.GetKey = function () {
+        return this.X + "-" + this.Y;
     };
     return Pos;
 }());
@@ -306,6 +328,7 @@ var INIT_STATE = "\n##############\n#B....d##A####\n###..###c...a#\n#....######C
 var ROOT_GRID = new Grid(INIT_STATE);
 var RENDERER;
 var TIME_SLIDER;
+var CANVAS_SIZE = 0;
 function setup() {
     RENDERER = createCanvas(windowWidth, windowHeight);
     TIME_SLIDER = createSlider(0, 100, 0, 0.01);
@@ -316,14 +339,14 @@ function windowResized() {
     calculateSizes();
 }
 function calculateSizes() {
-    var canvasSize = Math.min(windowWidth - 20, windowHeight - 50);
-    var cellSize = Math.min(canvasSize / ROOT_GRID.Width, canvasSize / ROOT_GRID.Height);
+    CANVAS_SIZE = Math.min(windowWidth - 20, windowHeight - 70);
+    var cellSize = Math.min(CANVAS_SIZE / ROOT_GRID.Width, CANVAS_SIZE / ROOT_GRID.Height);
     ROOT_GRID.CellWidth = cellSize;
     ROOT_GRID.CellHeight = cellSize;
-    ROOT_GRID.PosX = windowWidth / 2 - canvasSize / 2;
-    ROOT_GRID.PosY = (windowHeight - 30) / 2 - canvasSize / 2;
-    TIME_SLIDER.position(ROOT_GRID.PosX, ROOT_GRID.PosY + canvasSize + 10);
-    TIME_SLIDER.style("width", canvasSize + "px");
+    ROOT_GRID.PosX = windowWidth / 2 - CANVAS_SIZE / 2;
+    ROOT_GRID.PosY = (windowHeight - 50) / 2 - CANVAS_SIZE / 2;
+    TIME_SLIDER.position(ROOT_GRID.PosX, ROOT_GRID.PosY + CANVAS_SIZE + 30);
+    TIME_SLIDER.style("width", CANVAS_SIZE + "px");
 }
 function mouseClicked() {
     ROOT_GRID.OnMouseClick(mouseX, mouseY);
