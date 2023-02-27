@@ -10,6 +10,10 @@ class Pos {
     public Equals(pos: Pos) {
         return this.X == pos.X && this.Y == pos.Y;
     }
+    
+    public Neighbors() {
+        return [this.Up(), this.Down(), this.Left(), this.Right()];
+    }
 
     public Up() {
         return new Pos(this.X, this.Y - 1);
@@ -25,5 +29,9 @@ class Pos {
     
     public Right() {
         return new Pos(this.X + 1, this.Y);
+    }
+    
+    public GetKey() {
+        return `${this.X}-${this.Y}`;
     }
 }

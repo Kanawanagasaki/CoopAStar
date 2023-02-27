@@ -5,6 +5,10 @@ class Agent {
     public readonly Start: Pos;
     public Goal: Pos | undefined;
 
+    public IsFinished: boolean;
+    public FinishStep: number;
+    public LastMoveStep: number;
+
     public Path: Pos[] = [];
 
     private _isTracked: boolean = false;
@@ -31,6 +35,7 @@ class Agent {
     }
 
     public CalculatePath() {
+
         const goalNode = new NodePos(this.Goal, 0);
         goalNode.G = 0;
         goalNode.H = this.Manhattan(this.Goal, this.Start);
@@ -39,53 +44,40 @@ class Agent {
 
         const startNode = new NodePos(this.Start, 0);
         startNode.G = 0;
-        startNode.H = this.CalculateRRAS(startNode)?.F ?? Number.POSITIVE_INFINITY;
+        startNode.H = this.CalculateRRAS(startNode);
         const openSet: NodePos[] = [startNode];
-        const closedSet: Record<string, NodePos> = { [startNode.GetNodeKey()]: startNode };
+        const closedSet: Record<string, NodePos> = {};
 
         for (let z = 0; z < 1000 && openSet.length > 0; z++) {
             openSet.sort((a, b) => a.F - b.F);
             let current = openSet.shift();
-            if (current.X == this.Goal.X && current.Y == this.Goal.Y) {
+            closedSet[current.GetNodeKey()] = current;
+            if (current.Equals(this.Goal)) {
                 while (current) {
                     this.Path.unshift(current);
                     current = current.PrevNode;
                 }
                 return true;
             }
-            const neighbors: Neighbor[] = [];
 
-            const up = current.Up();
-            if (!this.Grid.IsWall(up) && !this.Grid.IsAgent(this, up, current.Step + 1, true))
-                neighbors.push(new Neighbor(up, 1.1));
-
-            const down = current.Down();
-            if (!this.Grid.IsWall(down) && !this.Grid.IsAgent(this, down, current.Step + 1, true))
-                neighbors.push(new Neighbor(down, 1.1));
-
-            const left = current.Left();
-            if (!this.Grid.IsWall(left) && !this.Grid.IsAgent(this, left, current.Step + 1, true))
-                neighbors.push(new Neighbor(left, 1.1));
-
-            const right = current.Right();
-            if (!this.Grid.IsWall(right) && !this.Grid.IsAgent(this, right, current.Step + 1, true))
-                neighbors.push(new Neighbor(right, 1.1));
+            const neighborNodes: Neighbor[] = [];
+            for (const neighbor of current.Neighbors())
+                if (!this.Grid.IsWall(neighbor) && !this.Grid.IsAgent(this, neighbor, current.Step + 1, true))
+                    neighborNodes.push(new Neighbor(neighbor, 1.1));
 
             if (!this.Grid.IsAgent(this, current, current.Step + 1, true))
-                neighbors.push(new Neighbor(current, 1));
+                neighborNodes.push(new Neighbor(current, 1));
 
-            for (const neighbor of neighbors) {
+            for (const neighbor of neighborNodes) {
                 const tentativeNode = new NodePos(neighbor, current.Step + 1);
                 tentativeNode.G = current.G + neighbor.Score;
                 const nodeKey = tentativeNode.GetNodeKey();
                 if (!(nodeKey in closedSet) || tentativeNode.G < closedSet[nodeKey].G) {
                     tentativeNode.PrevNode = current;
-                    tentativeNode.H = this.CalculateRRAS(tentativeNode)?.F ?? Number.POSITIVE_INFINITY;
-                    for (let i = 0; i < openSet.length; i++)
-                        if (openSet[i].Equals(tentativeNode) && openSet[i].Step == tentativeNode.Step)
-                            openSet.splice(i, 1);
-                    openSet.push(tentativeNode);
+                    tentativeNode.H = this.CalculateRRAS(tentativeNode);
                     closedSet[nodeKey] = tentativeNode;
+                    if (!openSet.some(x => x.Equals(tentativeNode) && x.Step == tentativeNode.Step))
+                        openSet.push(tentativeNode);
                 }
             }
         }
@@ -93,50 +85,67 @@ class Agent {
         return false;
     }
 
-    private CalculateRRAS(N: NodePos) {
-        const posKey = N.GetNodeKey();
+    private CalculateRRAS(N: Pos) {
+        if (N.Equals(this.Goal))
+            return 0;
+
+        const posKey = N.GetKey();
         if (this._rrasClosedSet.hasOwnProperty(posKey))
-            return this._rrasClosedSet[posKey];
+            return this._rrasClosedSet[posKey].G;
 
         while (this._rrasOpenSet.length > 0) {
             this._rrasOpenSet.sort((a, b) => a.F - b.F);
             let current = this._rrasOpenSet.shift();
+            this._rrasClosedSet[current.GetKey()] = current;
             if (current.X == N.X && current.Y == N.Y)
-                return current;
+                return current.G;
+
             const neighbors: Neighbor[] = [];
-
-            const up = current.Up();
-            if (!this.Grid.IsWall(up)) neighbors.push(new Neighbor(up, 1.1));
-
-            const down = current.Down();
-            if (!this.Grid.IsWall(down)) neighbors.push(new Neighbor(down, 1.1));
-
-            const left = current.Left();
-            if (!this.Grid.IsWall(left)) neighbors.push(new Neighbor(left, 1.1));
-
-            const right = current.Right();
-            if (!this.Grid.IsWall(right)) neighbors.push(new Neighbor(right, 1.1));
+            for (const neighbor of current.Neighbors())
+                if (!this.Grid.IsWall(neighbor))
+                    neighbors.push(new Neighbor(neighbor, 1));
 
             for (const neighbor of neighbors) {
                 const tentativeNode = new NodePos(neighbor, current.Step + 1);
                 tentativeNode.G = current.G + neighbor.Score;
-                const nodeKey = tentativeNode.GetNodeKey();
+                const nodeKey = tentativeNode.GetKey();
                 if (!(nodeKey in this._rrasClosedSet) || tentativeNode.G < this._rrasClosedSet[nodeKey].G) {
                     tentativeNode.PrevNode = current;
                     tentativeNode.H = this.Manhattan(tentativeNode, this.Start);
-                    for (let i = 0; i < this._rrasOpenSet.length; i++)
-                        if (this._rrasOpenSet[i].Equals(tentativeNode))
-                            this._rrasOpenSet.splice(i, 1);
-                    this._rrasOpenSet.push(tentativeNode);
                     this._rrasClosedSet[nodeKey] = tentativeNode;
+                    if (!this._rrasOpenSet.some(x => x.Equals(tentativeNode)))
+                        this._rrasOpenSet.push(tentativeNode);
                 }
             }
         }
-        return null;
+        return Number.POSITIVE_INFINITY;
     }
 
     private Manhattan(a: Pos, b: Pos) {
         return Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y);
+    }
+
+    public Summarize() {
+        this.FinishStep = 0;
+        this.IsFinished = false;
+        this.LastMoveStep = 0;
+
+        if (this.Path.length > 0) {
+            const lastPos = this.Path[this.Path.length - 1];
+            this.IsFinished = lastPos.Equals(this.Goal);
+            for (let i = this.Path.length - 1; i >= 0; i--) {
+                if (!this.Path[i].Equals(this.Goal)) {
+                    this.FinishStep = i + 1;
+                    break;
+                }
+            }
+            for (let i = this.Path.length - 1; i >= 0; i--) {
+                if (!this.Path[i].Equals(lastPos)) {
+                    this.LastMoveStep = i + 1;
+                    break;
+                }
+            }
+        }
     }
 
     public OnMouseClick(cellX: number, cellY: number) {
@@ -167,6 +176,13 @@ class Agent {
                         pos2.X * cellWidth + cellWidth / 2,
                         pos2.Y * cellHeight + cellHeight / 2
                     );
+
+                const score = this.CalculateRRAS(pos2);
+                push();
+                strokeWeight(1);
+                textAlign("left", "top");
+                text(score, pos2.X * cellWidth + 6, pos2.Y * cellHeight + 6);
+                pop();
             }
         }
 
