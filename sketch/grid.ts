@@ -1,4 +1,7 @@
 class Grid {
+    public static readonly DEPTH = 16;
+    public static readonly FRAMES = 10;
+
     [y: number]: { [x: number]: boolean };
     public Width: number = 0;
     public Height: number = 0;
@@ -35,15 +38,23 @@ class Grid {
             }
             this.Width = Math.max(this.Width, chs.length);
         }
+        this.Height = lines.length;
 
-        for (const agent of this.Agents)
+        for (const agent of this.Agents) {
             if (!agent.Goal)
                 agent.Goal = agent.Start;
+            agent.Init(Grid.DEPTH);
+        }
 
-        for (const agent of this.Agents)
-            agent.CalculatePath();
+        for (let i = 1; i < Grid.FRAMES; i++)
+            for (let j = 0; j < this.Agents.length; j++)
+                this.Agents[(i + j) % this.Agents.length].CalculateWindowedPath(i * Math.floor(Grid.DEPTH / 2), Grid.DEPTH);
 
-        this.Height = lines.length;
+        for (const agent of this.Agents) {
+            agent.CalculateWindowedPath(Grid.FRAMES * Math.floor(Grid.DEPTH / 2), Grid.DEPTH);
+            agent.CutPathFrom(Grid.FRAMES * Math.floor(Grid.DEPTH / 2));
+            agent.Summarize();
+        }
     }
 
     public IsWall(pos: Pos) {
@@ -54,20 +65,14 @@ class Grid {
         for (const agent of this.Agents) {
             if (forWho == agent)
                 continue;
-            else if (agent.Path.length == 0) {
-                if (agent.Start.Equals(pos))
-                    return true;
-            }
-            else if (agent.Path.length <= step) {
-                if (agent.Goal.Equals(pos))
-                    return true;
-            }
+            else if (agent.Path.length <= step)
+                continue;
             else if (agent.Path[step].Equals(pos))
-                return true;
+                return { agent, step };
             else if (intersectionCheck && agent.Path[step - 1].Equals(pos))
-                return true;
+                return { agent, step: step - 1 };
         }
-        return false;
+        return null;
     }
 
     public OnMouseClick(x: number, y: number) {
@@ -105,9 +110,20 @@ class Grid {
             }
         }
 
-        const longestPath = Math.max(...this.Agents.map(x => x.Path.length));
+        const longestPath = Math.max(...this.Agents.map(x => x.LastMoveStep));
         for (const agent of this.Agents)
-            agent.Render(this.CellWidth, this.CellHeight, percent * (longestPath - 1));
+            agent.Render(this.CellWidth, this.CellHeight, percent * longestPath);
+
+        push();
+        strokeWeight(1);
+        textAlign("left", "top");
+        textSize(16);
+        // stroke(255, 255, 255);
+        // noFill();
+        noStroke();
+        fill(255, 255, 255);
+        text("Step: " + Math.round(percent * longestPath), 0, CANVAS_SIZE + 10);
+        pop();
 
         pop();
     }
