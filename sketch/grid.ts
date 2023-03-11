@@ -67,40 +67,69 @@ class Grid {
     }
 
     public Calculate() {
-        const state = new State();
 
-        for (const agent of this.Agents)
-            state.CurrentPos[agent.Id] = agent.Start;
-
-        state.Push();
-
-        while (true) {
-            const agentsToProcess = [];
-            for (const agent of this.Agents)
-                if (!state.GetAgentPos(agent).Equals(agent.Goal))
-                    agentsToProcess.push(agent);
-
-            if (agentsToProcess.length == 0)
-                break;
-
-            forLoop:
-            for (const agent of agentsToProcess) {
-                while (!state.GetAgentPos(agent).Equals(agent.Goal)) {
-                    if (!this.Push(state, agent, agent.Goal, [])) {
-                        if (!this.Swap(state, agent)) {
-                            continue forLoop;
-                        }
-                    }
-                }
-                state.FinishedAgents[agent.Id] = state.GetAgentPos(agent);
+        const states: { state: State, agents: Agent[] }[] = [];
+        for (const agent of this.Agents) {
+            if (!states.some(x => x.agents.some(xx => xx == agent))) {
+                const agents = this.DiscoverAgents(agent.Start);
+                const state = new State();
+                for (const agent of agents)
+                    state.CurrentPos[agent.Id] = agent.Start;
+                states.push({ state, agents });
             }
         }
 
-        for (const agent of this.Agents) {
-            for (const step of state.CoopPath)
-                agent.Path.push(step[agent.Id]);
-            agent.Summarize();
+        for (const stateBundle of states) {
+            const state = stateBundle.state;
+
+            state.Push();
+
+            for (let i = 0; i < 100; i++) {
+                const agentsToProcess = [];
+                for (const agent of stateBundle.agents)
+                    if (!state.GetAgentPos(agent).Equals(agent.Goal))
+                        agentsToProcess.push(agent);
+
+                if (agentsToProcess.length == 0)
+                    break;
+
+                forLoop:
+                for (const agent of agentsToProcess) {
+                    while (!state.GetAgentPos(agent).Equals(agent.Goal)) {
+                        if (!this.Push(state, agent, agent.Goal, [])) {
+                            if (!this.Swap(state, agent)) {
+                                continue forLoop;
+                            }
+                        }
+                    }
+                    state.FinishedAgents[agent.Id] = state.GetAgentPos(agent);
+                }
+            }
+
+            for (const agent of stateBundle.agents) {
+                for (const step of state.CoopPath)
+                    agent.Path.push(step[agent.Id]);
+                agent.Summarize();
+            }
         }
+
+    }
+
+    private DiscoverAgents(pos: Pos) {
+        const open = [pos];
+        const closed: Record<string, Pos> = {};
+        const ret: Agent[] = [];
+        while (open.length > 0) {
+            const current = open.shift();
+            for (const agent of this.Agents.filter(x => x.Start.Equals(current))) {
+                ret.push(agent);
+            }
+            closed[current.GetKey()] = current;
+            for (const neighbor of current.Neighbors().filter(x => !this.IsWall(x)))
+                if (!closed.hasOwnProperty(neighbor.GetKey()) && !open.some(x => x.Equals(neighbor)))
+                    open.push(neighbor);
+        }
+        return ret;
     }
 
     private Push(state: State, agent: Agent, goal: Pos, occupied: Pos[]): boolean {
