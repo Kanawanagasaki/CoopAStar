@@ -1,4 +1,7 @@
 class Agent {
+    private static A_ID: number = 0;
+
+    public readonly Id: number;
     public readonly Grid: Grid;
     public readonly Name: string;
     public readonly NameHash: number;
@@ -13,11 +16,8 @@ class Agent {
 
     private _isTracked: boolean = false;
 
-    // rras - Reverse Resumable A*
-    private _rrasOpenSet: NodePos[];
-    private _rrasClosedSet: Record<string, NodePos>;
-
     public constructor(grid: Grid, name: string, startX: number, startY: number) {
+        this.Id = ++Agent.A_ID;
         this.Grid = grid;
         this.Name = name;
         this.Start = new Pos(startX, startY);
@@ -32,138 +32,6 @@ class Agent {
             if (this.NameHash < 0)
                 this.NameHash = 0x7FFFFFFF + this.NameHash;
         }
-    }
-
-    public Init(depth: number) {
-        const goalNode = new NodePos(this.Goal, 0);
-        goalNode.G = 0;
-        goalNode.H = this.Manhattan(this.Goal, this.Start);
-        this._rrasOpenSet = [goalNode];
-        this._rrasClosedSet = {};
-
-        this.CalculateWindowedPath(0, depth);
-    }
-
-    public CalculateWindowedPath(fromStep: number, depth: number) {
-
-        let fromNode = this.Start;
-        if (this.Path.length != 0) {
-            if (this.Path.length <= fromStep)
-                throw new Error("Agent skipped some steps in a path. " + this.Path.length + ", " + fromStep);
-            fromNode = this.Path[fromStep];
-        }
-
-        const startNode = new NodePos(fromNode, fromStep);
-        startNode.G = 0;
-        startNode.H = this.CalculateRRAS(startNode);
-        const openSet = [startNode];
-        const closedSet: Record<string, NodePos> = {};
-        let current: NodePos = null;
-        let isDepthReached = false;
-
-        for (let i = 0; i < 1000 && openSet.length > 0; i++) {
-            openSet.sort((a, b) => a.F - b.F);
-            current = openSet.shift();
-            closedSet[current.GetNodeKey()] = current;
-            if (fromStep + depth <= current.Step) {
-                isDepthReached = true;
-                break;
-            }
-            let neighborNodes: Neighbor[] = [];
-
-            for (const neighbor of current.Neighbors())
-                if (!this.Grid.IsWall(neighbor) && !this.Grid.IsAgent(this, neighbor, current.Step + 1, true))
-                    neighborNodes.push(new Neighbor(neighbor, 1.1));
-
-            if (!this.Grid.IsAgent(this, current, current.Step + 1, true))
-                neighborNodes.push(new Neighbor(current, 1));
-
-            for (const neighbor of neighborNodes) {
-                const tentativeNode = new NodePos(neighbor, current.Step + 1);
-                tentativeNode.G = current.G + neighbor.Score;
-                const nodeKey = tentativeNode.GetNodeKey();
-                if (!(nodeKey in closedSet) || tentativeNode.G < closedSet[nodeKey].G) {
-                    tentativeNode.PrevNode = current;
-                    tentativeNode.H = this.CalculateRRAS(tentativeNode);
-                    closedSet[nodeKey] = tentativeNode;
-                    if (!openSet.some(x => x.Equals(tentativeNode) && x.Step == tentativeNode.Step))
-                        openSet.push(tentativeNode);
-                }
-            }
-        }
-
-        if (!isDepthReached) {
-
-            const neighbors = [current, ...current.Neighbors()];
-            const blameAgents = neighbors.map(x => this.Grid.IsAgent(this, x, current.Step + 1, true)).filter(x => x);
-            if (blameAgents.length == 0)
-                throw new Error("Failed to calculate path and there was no agents to blame");
-            blameAgents.sort((a, b) => a.step - b.step);
-            const blameAgent = blameAgents[0];
-            blameAgent.agent.CutPathFrom(blameAgent.step);
-            this.CalculateWindowedPath(fromStep, depth);
-            blameAgent.agent.CalculateWindowedPath(blameAgent.step - 1, depth);
-        }
-        else {
-            let path: Pos[] = [];
-            while (current) {
-                path.unshift(current);
-                current = current.PrevNode;
-            }
-
-            for (let i = 0; i < Math.max(depth + 1, path.length); i++)
-                this.Path[fromStep + i] = path[i] ? path[i] : this.Path[fromStep + i - 1];
-        }
-
-    }
-
-    private CalculateRRAS(N: Pos) {
-        if (N.Equals(this.Goal))
-            return 0;
-
-        const posKey = N.GetKey();
-        if (this._rrasClosedSet.hasOwnProperty(posKey))
-            return this._rrasClosedSet[posKey].G;
-
-        while (this._rrasOpenSet.length > 0) {
-            this._rrasOpenSet.sort((a, b) => a.F - b.F);
-            let current = this._rrasOpenSet.shift();
-            this._rrasClosedSet[current.GetKey()] = current;
-            if (current.X == N.X && current.Y == N.Y)
-                return current.G;
-            const neighbors: Neighbor[] = [];
-
-            const up = current.Up();
-            if (!this.Grid.IsWall(up)) neighbors.push(new Neighbor(up, 1));
-
-            const down = current.Down();
-            if (!this.Grid.IsWall(down)) neighbors.push(new Neighbor(down, 1));
-
-            const left = current.Left();
-            if (!this.Grid.IsWall(left)) neighbors.push(new Neighbor(left, 1));
-
-            const right = current.Right();
-            if (!this.Grid.IsWall(right)) neighbors.push(new Neighbor(right, 1));
-
-            for (const neighbor of neighbors) {
-                const tentativeNode = new NodePos(neighbor, current.Step + 1);
-                tentativeNode.G = current.G + neighbor.Score;
-                const nodeKey = tentativeNode.GetKey();
-                if (!(nodeKey in this._rrasClosedSet) || tentativeNode.G < this._rrasClosedSet[nodeKey].G) {
-                    tentativeNode.PrevNode = current;
-                    tentativeNode.H = this.Manhattan(tentativeNode, this.Start);
-                    this._rrasClosedSet[nodeKey] = tentativeNode;
-                    if (!this._rrasOpenSet.some(x => x.Equals(tentativeNode)))
-                        this._rrasOpenSet.push(tentativeNode);
-                }
-            }
-        }
-        return Number.POSITIVE_INFINITY;
-    }
-
-    public CutPathFrom(step: number) {
-        if (step < this.Path.length)
-            this.Path.splice(step, this.Path.length - step);
     }
 
     public Summarize() {
@@ -232,9 +100,18 @@ class Agent {
         if (this.Path.length == 0)
             ellipse(this.Start.X * cellWidth + cellWidth / 2, this.Start.Y * cellHeight + cellHeight / 2, cellWidth * .6, cellHeight * .6);
         else {
-            const index1 = Math.min(Math.floor(time), this.Path.length - 1);
-            const index2 = Math.min(Math.ceil(time), this.Path.length - 1);
+            let index1 = Math.min(Math.floor(time), this.Path.length - 1);
+            let index2 = Math.min(Math.ceil(time), this.Path.length - 1);
             const step = time % 1;
+
+            if (index1 >= this.Path.length)
+                index1 = this.Path.length - 1;
+            if (index1 < 0 || isNaN(index1))
+                index1 = 0;
+            if (index2 >= this.Path.length)
+                index2 = this.Path.length - 1;
+            if (index2 < 0 || isNaN(index2))
+                index2 = 0;
 
             const posX = this.Path[index1].X + (this.Path[index2].X - this.Path[index1].X) * step;
             const posY = this.Path[index1].Y + (this.Path[index2].Y - this.Path[index1].Y) * step;

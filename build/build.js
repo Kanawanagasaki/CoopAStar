@@ -1,21 +1,15 @@
-var __spreadArrays = (this && this.__spreadArrays) || function () {
-    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
-    for (var r = Array(s), k = 0, i = 0; i < il; i++)
-        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
-            r[k] = a[j];
-    return r;
-};
-var Agent = (function () {
-    function Agent(grid, name, startX, startY) {
+class Agent {
+    constructor(grid, name, startX, startY) {
         this.Path = [];
         this._isTracked = false;
+        this.Id = ++Agent.A_ID;
         this.Grid = grid;
         this.Name = name;
         this.Start = new Pos(startX, startY);
         this.NameHash = 0;
         if (this.Name.length > 0) {
-            for (var i = 0; i < this.Name.length; i++) {
-                var chr = this.Name.charCodeAt(i);
+            for (let i = 0; i < this.Name.length; i++) {
+                const chr = this.Name.charCodeAt(i);
                 this.NameHash = ((this.NameHash << 5) - this.NameHash) + chr;
                 this.NameHash |= 0;
             }
@@ -23,173 +17,46 @@ var Agent = (function () {
                 this.NameHash = 0x7FFFFFFF + this.NameHash;
         }
     }
-    Agent.prototype.Init = function (depth) {
-        var goalNode = new NodePos(this.Goal, 0);
-        goalNode.G = 0;
-        goalNode.H = this.Manhattan(this.Goal, this.Start);
-        this._rrasOpenSet = [goalNode];
-        this._rrasClosedSet = {};
-        this.CalculateWindowedPath(0, depth);
-    };
-    Agent.prototype.CalculateWindowedPath = function (fromStep, depth) {
-        var _this = this;
-        var fromNode = this.Start;
-        if (this.Path.length != 0) {
-            if (this.Path.length <= fromStep)
-                throw new Error("Agent skipped some steps in a path. " + this.Path.length + ", " + fromStep);
-            fromNode = this.Path[fromStep];
-        }
-        var startNode = new NodePos(fromNode, fromStep);
-        startNode.G = 0;
-        startNode.H = this.CalculateRRAS(startNode);
-        var openSet = [startNode];
-        var closedSet = {};
-        var current = null;
-        var isDepthReached = false;
-        for (var i = 0; i < 1000 && openSet.length > 0; i++) {
-            openSet.sort(function (a, b) { return a.F - b.F; });
-            current = openSet.shift();
-            closedSet[current.GetNodeKey()] = current;
-            if (fromStep + depth <= current.Step) {
-                isDepthReached = true;
-                break;
-            }
-            var neighborNodes = [];
-            for (var _i = 0, _a = current.Neighbors(); _i < _a.length; _i++) {
-                var neighbor = _a[_i];
-                if (!this.Grid.IsWall(neighbor) && !this.Grid.IsAgent(this, neighbor, current.Step + 1, true))
-                    neighborNodes.push(new Neighbor(neighbor, 1.1));
-            }
-            if (!this.Grid.IsAgent(this, current, current.Step + 1, true))
-                neighborNodes.push(new Neighbor(current, 1));
-            var _loop_1 = function (neighbor) {
-                var tentativeNode = new NodePos(neighbor, current.Step + 1);
-                tentativeNode.G = current.G + neighbor.Score;
-                var nodeKey = tentativeNode.GetNodeKey();
-                if (!(nodeKey in closedSet) || tentativeNode.G < closedSet[nodeKey].G) {
-                    tentativeNode.PrevNode = current;
-                    tentativeNode.H = this_1.CalculateRRAS(tentativeNode);
-                    closedSet[nodeKey] = tentativeNode;
-                    if (!openSet.some(function (x) { return x.Equals(tentativeNode) && x.Step == tentativeNode.Step; }))
-                        openSet.push(tentativeNode);
-                }
-            };
-            var this_1 = this;
-            for (var _b = 0, neighborNodes_1 = neighborNodes; _b < neighborNodes_1.length; _b++) {
-                var neighbor = neighborNodes_1[_b];
-                _loop_1(neighbor);
-            }
-        }
-        if (!isDepthReached) {
-            var neighbors = __spreadArrays([current], current.Neighbors());
-            var blameAgents = neighbors.map(function (x) { return _this.Grid.IsAgent(_this, x, current.Step + 1, true); }).filter(function (x) { return x; });
-            if (blameAgents.length == 0)
-                throw new Error("Failed to calculate path and there was no agents to blame");
-            blameAgents.sort(function (a, b) { return a.step - b.step; });
-            var blameAgent = blameAgents[0];
-            blameAgent.agent.CutPathFrom(blameAgent.step);
-            this.CalculateWindowedPath(fromStep, depth);
-            blameAgent.agent.CalculateWindowedPath(blameAgent.step - 1, depth);
-        }
-        else {
-            var path = [];
-            while (current) {
-                path.unshift(current);
-                current = current.PrevNode;
-            }
-            for (var i = 0; i < Math.max(depth + 1, path.length); i++)
-                this.Path[fromStep + i] = path[i] ? path[i] : this.Path[fromStep + i - 1];
-        }
-    };
-    Agent.prototype.CalculateRRAS = function (N) {
-        if (N.Equals(this.Goal))
-            return 0;
-        var posKey = N.GetKey();
-        if (this._rrasClosedSet.hasOwnProperty(posKey))
-            return this._rrasClosedSet[posKey].G;
-        while (this._rrasOpenSet.length > 0) {
-            this._rrasOpenSet.sort(function (a, b) { return a.F - b.F; });
-            var current = this._rrasOpenSet.shift();
-            this._rrasClosedSet[current.GetKey()] = current;
-            if (current.X == N.X && current.Y == N.Y)
-                return current.G;
-            var neighbors = [];
-            var up = current.Up();
-            if (!this.Grid.IsWall(up))
-                neighbors.push(new Neighbor(up, 1));
-            var down = current.Down();
-            if (!this.Grid.IsWall(down))
-                neighbors.push(new Neighbor(down, 1));
-            var left = current.Left();
-            if (!this.Grid.IsWall(left))
-                neighbors.push(new Neighbor(left, 1));
-            var right = current.Right();
-            if (!this.Grid.IsWall(right))
-                neighbors.push(new Neighbor(right, 1));
-            var _loop_2 = function (neighbor) {
-                var tentativeNode = new NodePos(neighbor, current.Step + 1);
-                tentativeNode.G = current.G + neighbor.Score;
-                var nodeKey = tentativeNode.GetKey();
-                if (!(nodeKey in this_2._rrasClosedSet) || tentativeNode.G < this_2._rrasClosedSet[nodeKey].G) {
-                    tentativeNode.PrevNode = current;
-                    tentativeNode.H = this_2.Manhattan(tentativeNode, this_2.Start);
-                    this_2._rrasClosedSet[nodeKey] = tentativeNode;
-                    if (!this_2._rrasOpenSet.some(function (x) { return x.Equals(tentativeNode); }))
-                        this_2._rrasOpenSet.push(tentativeNode);
-                }
-            };
-            var this_2 = this;
-            for (var _i = 0, neighbors_1 = neighbors; _i < neighbors_1.length; _i++) {
-                var neighbor = neighbors_1[_i];
-                _loop_2(neighbor);
-            }
-        }
-        return Number.POSITIVE_INFINITY;
-    };
-    Agent.prototype.CutPathFrom = function (step) {
-        if (step < this.Path.length)
-            this.Path.splice(step, this.Path.length - step);
-    };
-    Agent.prototype.Summarize = function () {
+    Summarize() {
         this.FinishStep = 0;
         this.IsFinished = false;
         this.LastMoveStep = 0;
         if (this.Path.length > 0) {
-            var lastPos = this.Path[this.Path.length - 1];
+            const lastPos = this.Path[this.Path.length - 1];
             this.IsFinished = lastPos.Equals(this.Goal);
-            for (var i = this.Path.length - 1; i >= 0; i--) {
+            for (let i = this.Path.length - 1; i >= 0; i--) {
                 if (!this.Path[i].Equals(this.Goal)) {
                     this.FinishStep = i + 1;
                     break;
                 }
             }
-            for (var i = this.Path.length - 1; i >= 0; i--) {
+            for (let i = this.Path.length - 1; i >= 0; i--) {
                 if (!this.Path[i].Equals(lastPos)) {
                     this.LastMoveStep = i + 1;
                     break;
                 }
             }
         }
-    };
-    Agent.prototype.Manhattan = function (a, b) {
+    }
+    Manhattan(a, b) {
         return Math.abs(a.X - b.X) + Math.abs(a.Y - b.Y);
-    };
-    Agent.prototype.OnMouseClick = function (cellX, cellY) {
+    }
+    OnMouseClick(cellX, cellY) {
         if (this.Start.X == cellX && this.Start.Y == cellY)
             this._isTracked = !this._isTracked;
-    };
-    Agent.prototype.OnMouseMove = function (cellX, cellY) {
+    }
+    OnMouseMove(cellX, cellY) {
         return this.Start.X == cellX && this.Start.Y == cellY;
-    };
-    Agent.prototype.Render = function (cellWidth, cellHeight, time) {
-        var color = this.GetColor();
+    }
+    Render(cellWidth, cellHeight, time) {
+        const color = this.GetColor();
         stroke(color);
         strokeWeight(4);
         fill(0, 0, 0, 0);
         if (this._isTracked) {
-            for (var i = 1; i < this.Path.length; i++) {
-                var pos1 = this.Path[i - 1];
-                var pos2 = this.Path[i];
+            for (let i = 1; i < this.Path.length; i++) {
+                const pos1 = this.Path[i - 1];
+                const pos2 = this.Path[i];
                 line(pos1.X * cellWidth + cellWidth / 2, pos1.Y * cellHeight + cellHeight / 2, pos2.X * cellWidth + cellWidth / 2, pos2.Y * cellHeight + cellHeight / 2);
             }
         }
@@ -200,116 +67,397 @@ var Agent = (function () {
         if (this.Path.length == 0)
             ellipse(this.Start.X * cellWidth + cellWidth / 2, this.Start.Y * cellHeight + cellHeight / 2, cellWidth * .6, cellHeight * .6);
         else {
-            var index1 = Math.min(Math.floor(time), this.Path.length - 1);
-            var index2 = Math.min(Math.ceil(time), this.Path.length - 1);
-            var step = time % 1;
-            var posX = this.Path[index1].X + (this.Path[index2].X - this.Path[index1].X) * step;
-            var posY = this.Path[index1].Y + (this.Path[index2].Y - this.Path[index1].Y) * step;
+            let index1 = Math.min(Math.floor(time), this.Path.length - 1);
+            let index2 = Math.min(Math.ceil(time), this.Path.length - 1);
+            const step = time % 1;
+            if (index1 >= this.Path.length)
+                index1 = this.Path.length - 1;
+            if (index1 < 0 || isNaN(index1))
+                index1 = 0;
+            if (index2 >= this.Path.length)
+                index2 = this.Path.length - 1;
+            if (index2 < 0 || isNaN(index2))
+                index2 = 0;
+            const posX = this.Path[index1].X + (this.Path[index2].X - this.Path[index1].X) * step;
+            const posY = this.Path[index1].Y + (this.Path[index2].Y - this.Path[index1].Y) * step;
             ellipse(posX * cellWidth + cellWidth / 2, posY * cellHeight + cellHeight / 2, cellWidth * .6, cellHeight * .6);
         }
-    };
-    Agent.prototype.GetColor = function () {
-        return "hsl(" + this.NameHash * 43 % 360 + ", 100%, 35%)";
-    };
-    return Agent;
-}());
-var Grid = (function () {
-    function Grid(terrain) {
+    }
+    GetColor() {
+        return `hsl(${this.NameHash * 43 % 360}, 100%, 35%)`;
+    }
+}
+Agent.A_ID = 0;
+class Grid {
+    constructor(terrain) {
         this.Width = 0;
         this.Height = 0;
         this.Agents = [];
+        this.AgentsIs = {};
         this.PosX = 0;
         this.PosY = 0;
         this.CellWidth = 0;
         this.CellHeight = 0;
-        var lines = terrain.split("\n").map(function (x) { return x.trim(); }).filter(function (x) { return x != ""; });
-        var goals = {};
-        for (var iy = 0; iy < lines.length; iy++) {
+        const lines = terrain.split("\n").map(x => x.trim()).filter(x => x != "");
+        const goals = {};
+        for (let iy = 0; iy < lines.length; iy++) {
             this[iy] = [];
-            var chs = lines[iy].split("");
-            var _loop_3 = function (ix) {
-                this_3[iy][ix] = chs[ix] != "#";
+            const chs = lines[iy].split("");
+            for (let ix = 0; ix < chs.length; ix++) {
+                this[iy][ix] = chs[ix] != "#";
                 if (/[a-z]/.test(chs[ix])) {
-                    var agent = new Agent(this_3, chs[ix], ix, iy);
+                    const agent = new Agent(this, chs[ix], ix, iy);
                     if (chs[ix] in goals)
                         agent.Goal = goals[chs[ix]];
-                    this_3.Agents.push(agent);
+                    this.Agents.push(agent);
+                    this.AgentsIs[agent.Id] = agent;
                 }
                 else if (/[A-Z]/.test(chs[ix])) {
-                    var name_1 = chs[ix].toLowerCase();
-                    var agent = this_3.Agents.filter(function (x) { return x.Name == name_1; })[0];
+                    let name = chs[ix].toLowerCase();
+                    const agent = this.Agents.filter(x => x.Name == name)[0];
                     if (agent)
                         agent.Goal = new Pos(ix, iy);
                     else
-                        goals[name_1] = new Pos(ix, iy);
+                        goals[name] = new Pos(ix, iy);
                 }
-            };
-            var this_3 = this;
-            for (var ix = 0; ix < chs.length; ix++) {
-                _loop_3(ix);
             }
             this.Width = Math.max(this.Width, chs.length);
         }
         this.Height = lines.length;
-        for (var _i = 0, _a = this.Agents; _i < _a.length; _i++) {
-            var agent = _a[_i];
+        for (const agent of this.Agents)
             if (!agent.Goal)
                 agent.Goal = agent.Start;
-            agent.Init(Grid.DEPTH);
+    }
+    AddAgent(name, startX, startY, goalX, goalY) {
+        if (this.IsWall(new Pos(startX, startY)))
+            throw new Error("You tried to spawn agent " + name + " in wall");
+        if (this.IsWall(new Pos(goalX, goalY)))
+            throw new Error("You tried to set goal for agent " + name + " in wall");
+        for (const a of this.Agents) {
+            if (a.Start.X == startX && a.Start.Y == startY)
+                throw new Error("Start position conflict between " + a.Name + " and " + name);
+            if (a.Goal.X == goalX && a.Goal.Y == goalY)
+                throw new Error("Goal position conflict between " + a.Name + " and " + name);
         }
-        for (var i = 1; i < Grid.FRAMES; i++)
-            for (var j = 0; j < this.Agents.length; j++)
-                this.Agents[(i + j) % this.Agents.length].CalculateWindowedPath(i * Math.floor(Grid.DEPTH / 2), Grid.DEPTH);
-        for (var _b = 0, _c = this.Agents; _b < _c.length; _b++) {
-            var agent = _c[_b];
-            agent.CalculateWindowedPath(Grid.FRAMES * Math.floor(Grid.DEPTH / 2), Grid.DEPTH);
-            agent.CutPathFrom(Grid.FRAMES * Math.floor(Grid.DEPTH / 2));
+        const agent = new Agent(this, name, startX, startY);
+        agent.Goal = new Pos(goalX, goalY);
+        this.Agents.push(agent);
+        this.AgentsIs[agent.Id] = agent;
+    }
+    Calculate() {
+        const state = new State();
+        for (const agent of this.Agents)
+            state.CurrentPos[agent.Id] = agent.Start;
+        state.Push();
+        while (true) {
+            const agentsToProcess = [];
+            for (const agent of this.Agents)
+                if (!state.GetAgentPos(agent).Equals(agent.Goal))
+                    agentsToProcess.push(agent);
+            if (agentsToProcess.length == 0)
+                break;
+            forLoop: for (const agent of agentsToProcess) {
+                while (!state.GetAgentPos(agent).Equals(agent.Goal)) {
+                    if (!this.Push(state, agent, agent.Goal, [])) {
+                        if (!this.Swap(state, agent)) {
+                            continue forLoop;
+                        }
+                    }
+                }
+                state.FinishedAgents[agent.Id] = state.GetAgentPos(agent);
+            }
+        }
+        for (const agent of this.Agents) {
+            for (const step of state.CoopPath)
+                agent.Path.push(step[agent.Id]);
             agent.Summarize();
         }
     }
-    Grid.prototype.IsWall = function (pos) {
+    Push(state, agent, goal, occupied) {
+        const pathToGoal = this.ShortestPath(state.GetAgentPos(agent), goal, occupied);
+        if (pathToGoal === false)
+            return false;
+        pathToGoal.shift();
+        let v = pathToGoal.shift();
+        while (!state.GetAgentPos(agent).Equals(goal)) {
+            while (v && this.IsEmpty(state, v)) {
+                state.CurrentPos[agent.Id] = v;
+                state.Push();
+                v = pathToGoal.shift();
+            }
+            if (!state.GetAgentPos(agent).Equals(goal)) {
+                const occupiedCopy = [...occupied, ...state.GetFinishedPositions(), state.GetAgentPos(agent)];
+                const emptyV = this.ClosestEmpty(state, v, occupiedCopy);
+                if (emptyV === false)
+                    return false;
+                const pathToEmptyV = this.ShortestPath(v, emptyV, occupiedCopy);
+                if (pathToEmptyV === false)
+                    return false;
+                pathToEmptyV.pop();
+                const vv = pathToEmptyV.pop();
+                const agentIdToPush = state.GetAgentIdAtPos(vv);
+                if (agentIdToPush === false)
+                    return false;
+                this.Push(state, this.AgentsIs[agentIdToPush], emptyV, occupied);
+            }
+        }
+        return true;
+    }
+    MultiPush(state, agents, goal, occupied) {
+        for (let i = 1; i < agents.length; i++)
+            if (this.ManhattanDistance(state.GetAgentPos(agents[i - 1]), state.GetAgentPos(agents[i])) != 1)
+                throw new Error("Distance between agents must be 1");
+        const pathToGoal = this.ShortestPath(state.GetAgentPos(agents[0]), goal, occupied);
+        if (pathToGoal === false)
+            return false;
+        if (state.GetAgentPos(agents[agents.length - 1]).Equals(pathToGoal[agents.length - 1])) {
+            agents = agents.reverse();
+            pathToGoal.splice(0, agents.length - 1);
+        }
+        pathToGoal.shift();
+        let v = pathToGoal.shift();
+        while (!state.GetAgentPos(agents[0]).Equals(goal)) {
+            while (v && this.IsEmpty(state, v)) {
+                for (let i = 1; i < agents.length; i++)
+                    state.CurrentPos[agents[i].Id] = state.CurrentPos[agents[i - 1].Id];
+                state.CurrentPos[agents[0].Id] = v;
+                state.Push();
+                v = pathToGoal.shift();
+            }
+            if (!state.GetAgentPos(agents[0]).Equals(goal)) {
+                const occupiedCopy = [...occupied, state.GetAgentPos(agents[0])];
+                const emptyV = this.ClosestEmpty(state, v, occupiedCopy);
+                if (emptyV === false)
+                    return false;
+                const pathToEmptyV = this.ShortestPath(v, emptyV, occupiedCopy);
+                if (pathToEmptyV === false)
+                    return false;
+                pathToEmptyV.pop();
+                const vv = pathToEmptyV.pop();
+                const agentIdToPush = state.GetAgentIdAtPos(vv);
+                if (!agentIdToPush)
+                    return false;
+                this.Push(state, this.AgentsIs[agentIdToPush], emptyV, occupied);
+            }
+        }
+        return true;
+    }
+    Swap(state, agent) {
+        const pathToGoal = this.ShortestPath(state.GetAgentPos(agent), agent.Goal, []);
+        if (pathToGoal === false || pathToGoal.length < 2)
+            return false;
+        const swapAgentId = state.GetAgentIdAtPos(pathToGoal[1]);
+        if (!swapAgentId)
+            return false;
+        let swapAgent = this.AgentsIs[swapAgentId];
+        let success = false;
+        const swapVertices = this.GetSwapVertices(state.GetAgentPos(agent));
+        let tempState;
+        while (swapVertices.length > 0 && !success) {
+            const v = swapVertices.shift();
+            const pathToV = this.ShortestPath(state.GetAgentPos(agent), v, []);
+            if (pathToV === false)
+                return false;
+            tempState = new State();
+            tempState.CurrentPos = state.GetCurrentPosShallowCopy();
+            if (this.MultiPush(tempState, [agent, swapAgent], v, []) && this.Clear(tempState, v, agent, swapAgent))
+                success = true;
+        }
+        if (!success)
+            return false;
+        state.PushFromState(tempState);
+        let vertex = state.GetAgentPos(agent);
+        let vertexBack = state.GetAgentPos(swapAgent);
+        let verticesForSwap = vertex.Neighbors().filter(x => !this.IsWall(x) && !x.Equals(state.GetAgentPos(agent)) && !x.Equals(state.GetAgentPos(swapAgent)));
+        if (verticesForSwap.length < 2) {
+            verticesForSwap = vertexBack.Neighbors().filter(x => !this.IsWall(x) && !x.Equals(state.GetAgentPos(agent)) && !x.Equals(state.GetAgentPos(swapAgent)));
+            if (verticesForSwap.length < 2)
+                return;
+            [vertex, vertexBack] = [vertexBack, vertex];
+            [agent, swapAgent] = [swapAgent, agent];
+        }
+        const emptyVertices = verticesForSwap.filter(x => this.IsEmpty(state, x));
+        if (emptyVertices.length < 2)
+            return false;
+        state.CurrentPos[agent.Id] = emptyVertices[0];
+        state.CurrentPos[swapAgent.Id] = vertex;
+        state.Push();
+        state.CurrentPos[agent.Id] = vertex;
+        state.CurrentPos[swapAgent.Id] = emptyVertices[1];
+        state.Push();
+        state.CurrentPos[agent.Id] = vertexBack;
+        state.CurrentPos[swapAgent.Id] = vertex;
+        state.Push();
+        state.PushFromStateReverse(tempState, agent.Id, swapAgent.Id);
+        if (state.FinishedAgents.hasOwnProperty(swapAgent.Id) && !state.GetAgentPos(swapAgent).Equals(swapAgent.Goal))
+            delete state.FinishedAgents[swapAgent.Id];
+        return true;
+    }
+    Clear(state, vertex, agent1, agent2) {
+        if (state.GetAgentPos(agent2).Equals(vertex))
+            [agent1, agent2] = [agent2, agent1];
+        if (!state.GetAgentPos(agent1).Equals(vertex))
+            throw new Error("Neither agent 1, nor agent 2 was on top of the vertex");
+        const vertexBack = state.GetAgentPos(agent2);
+        const verticesForSwap = vertex.Neighbors().filter(x => !this.IsWall(x) && !x.Equals(state.GetAgentPos(agent1)) && !x.Equals(state.GetAgentPos(agent2)));
+        if (verticesForSwap.length < 2)
+            return false;
+        const emptyVertices = [];
+        const occupiedVertices = [];
+        for (const v of verticesForSwap)
+            if (this.IsEmpty(state, v))
+                emptyVertices.push(v);
+            else
+                occupiedVertices.push(v);
+        if (emptyVertices.length >= 2)
+            return true;
+        for (const occupiedVertex of occupiedVertices) {
+            const tempState = new State();
+            tempState.CurrentPos = state.GetCurrentPosShallowCopy();
+            const emptyV = this.ClosestEmpty(tempState, occupiedVertex, [vertex]);
+            if (emptyV !== false) {
+                const pathToEmptyV = this.ShortestPath(occupiedVertex, emptyV, [vertex]);
+                if (pathToEmptyV !== false) {
+                    pathToEmptyV.pop();
+                    const vv = pathToEmptyV.pop();
+                    const agentIdToPush = tempState.GetAgentIdAtPos(vv);
+                    if (agentIdToPush !== false && this.Push(tempState, this.AgentsIs[agentIdToPush], emptyV, [vertex])) {
+                        state.PushFromState(tempState);
+                        return true;
+                    }
+                }
+            }
+        }
+        if (emptyVertices.length == 1) {
+            const agentIdToMove = state.GetAgentIdAtPos(occupiedVertices[0]);
+            if (agentIdToMove === false)
+                throw new Error("Occupied vertex had no agents?");
+            const agentToMove = this.AgentsIs[agentIdToMove];
+            const tempState = new State();
+            tempState.CurrentPos = state.GetCurrentPosShallowCopy();
+            this.Push(tempState, agent1, vertexBack, []);
+            this.Push(tempState, agentToMove, emptyVertices[0], []);
+            tempState.CurrentPos[agent1.Id] = vertex;
+            tempState.CurrentPos[agent2.Id] = vertexBack;
+            tempState.Push();
+            const emptyV = this.ClosestEmpty(tempState, emptyVertices[0], [vertex]);
+            if (emptyV !== false) {
+                const pathToEmptyV = this.ShortestPath(emptyVertices[0], emptyV, [vertex]);
+                if (pathToEmptyV !== false) {
+                    pathToEmptyV.pop();
+                    const vv = pathToEmptyV.pop();
+                    const agentIdToPush = tempState.GetAgentIdAtPos(vv);
+                    if (agentIdToPush !== false && this.Push(tempState, this.AgentsIs[agentIdToPush], emptyV, [vertex])) {
+                        state.PushFromState(tempState);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    GetSwapVertices(node) {
+        const open = [node];
+        const closed = {};
+        const ret = [];
+        while (open.length > 0) {
+            open.sort((a, b) => this.ManhattanDistance(node, a) - this.ManhattanDistance(node, b));
+            const current = open.shift();
+            closed[current.GetKey()] = current;
+            const neighbors = current.Neighbors().filter(x => !this.IsWall(x));
+            if (3 <= neighbors.length)
+                ret.push(current);
+            for (const neighbor of neighbors)
+                if (!closed.hasOwnProperty(neighbor.GetKey()))
+                    open.push(neighbor);
+        }
+        return ret;
+    }
+    ClosestEmpty(state, node, occupied) {
+        const open = [node];
+        const closed = {};
+        while (open.length > 0) {
+            open.sort((a, b) => this.ManhattanDistance(node, a) - this.ManhattanDistance(node, b));
+            const current = open.shift();
+            if (this.IsEmpty(state, current))
+                return current;
+            closed[current.GetKey()] = current;
+            const neighbors = current.Neighbors().filter(x => !this.IsWall(x) && !occupied.some(x => x.Equals(current)));
+            for (const neighbor of neighbors)
+                if (!closed.hasOwnProperty(neighbor.GetKey()))
+                    open.push(neighbor);
+        }
+        return false;
+    }
+    ShortestPath(start, goal, occupied) {
+        const startNode = new NodePos(start);
+        startNode.G = 0;
+        startNode.H = this.ManhattanDistance(start, goal);
+        const open = [startNode];
+        const closed = {};
+        while (open.length > 0) {
+            open.sort((a, b) => a.F - b.F);
+            const current = open.shift();
+            if (current.Equals(goal)) {
+                const path = [];
+                let node = current;
+                while (node) {
+                    path.unshift(node);
+                    node = node.PrevNode;
+                }
+                return path;
+            }
+            closed[NodePos.GetNodeKey(current)] = current;
+            const neighbors = current.Neighbors().filter(x => !this.IsWall(x) && !occupied.some(xx => xx.Equals(x)));
+            for (const neighbor of neighbors) {
+                const G = current.G + 1;
+                const key = NodePos.GetNodeKey(neighbor);
+                if (!closed.hasOwnProperty(key)) {
+                    const tentativeNode = new NodePos(neighbor);
+                    tentativeNode.G = G;
+                    tentativeNode.H = this.ManhattanDistance(neighbor, goal);
+                    tentativeNode.PrevNode = current;
+                    open.push(tentativeNode);
+                }
+                else if (G < closed[key].G) {
+                    closed[key].G = G;
+                    closed[key].PrevNode = current;
+                }
+            }
+        }
+        return false;
+    }
+    IsEmpty(state, pos) {
+        return !this.IsWall(pos) && state.GetAgentIdAtPos(pos) === false;
+    }
+    IsWall(pos) {
         return !this.hasOwnProperty(pos.Y) || !this[pos.Y][pos.X];
-    };
-    Grid.prototype.IsAgent = function (forWho, pos, step, intersectionCheck) {
-        for (var _i = 0, _a = this.Agents; _i < _a.length; _i++) {
-            var agent = _a[_i];
-            if (forWho == agent)
-                continue;
-            else if (agent.Path.length <= step)
-                continue;
-            else if (agent.Path[step].Equals(pos))
-                return { agent: agent, step: step };
-            else if (intersectionCheck && agent.Path[step - 1].Equals(pos))
-                return { agent: agent, step: step - 1 };
-        }
-        return null;
-    };
-    Grid.prototype.OnMouseClick = function (x, y) {
-        var cellX = Math.floor((x - this.PosX) / this.CellWidth);
-        var cellY = Math.floor((y - this.PosY) / this.CellHeight);
-        for (var _i = 0, _a = this.Agents; _i < _a.length; _i++) {
-            var agent = _a[_i];
+    }
+    ManhattanDistance(pos1, pos2) {
+        return Math.abs(pos1.X - pos2.X) + Math.abs(pos1.Y - pos2.Y);
+    }
+    OnMouseClick(x, y) {
+        const cellX = Math.floor((x - this.PosX) / this.CellWidth);
+        const cellY = Math.floor((y - this.PosY) / this.CellHeight);
+        for (const agent of this.Agents)
             agent.OnMouseClick(cellX, cellY);
-        }
-    };
-    Grid.prototype.OnMouseMove = function (x, y) {
-        var cellX = Math.floor((x - this.PosX) / this.CellWidth);
-        var cellY = Math.floor((y - this.PosY) / this.CellHeight);
-        var shouldMakeCursorPointer = false;
-        for (var _i = 0, _a = this.Agents; _i < _a.length; _i++) {
-            var agent = _a[_i];
+    }
+    OnMouseMove(x, y) {
+        const cellX = Math.floor((x - this.PosX) / this.CellWidth);
+        const cellY = Math.floor((y - this.PosY) / this.CellHeight);
+        let shouldMakeCursorPointer = false;
+        for (const agent of this.Agents)
             if (agent.OnMouseMove(cellX, cellY))
                 shouldMakeCursorPointer = true;
-        }
         if (RENDERER)
             RENDERER.elt.style.cursor = shouldMakeCursorPointer ? "pointer" : "";
-    };
-    Grid.prototype.Render = function (percent) {
+    }
+    Render(percent) {
         push();
         translate(this.PosX, this.PosY);
         stroke(32, 32, 32);
-        for (var iy = 0; iy < this.Height; iy++) {
-            for (var ix = 0; ix < this.Width; ix++) {
+        for (let iy = 0; iy < this.Height; iy++) {
+            for (let ix = 0; ix < this.Width; ix++) {
                 if (this[iy][ix])
                     fill(255, 255, 255);
                 else
@@ -317,101 +465,156 @@ var Grid = (function () {
                 rect(ix * this.CellWidth, iy * this.CellHeight, this.CellWidth, this.CellHeight);
             }
         }
-        var longestPath = Math.max.apply(Math, this.Agents.map(function (x) { return x.LastMoveStep; }));
-        for (var _i = 0, _a = this.Agents; _i < _a.length; _i++) {
-            var agent = _a[_i];
+        const longestPath = Math.max(...this.Agents.map(x => x.LastMoveStep));
+        for (const agent of this.Agents)
             agent.Render(this.CellWidth, this.CellHeight, percent * longestPath);
-        }
         push();
         strokeWeight(1);
         textAlign("left", "top");
         textSize(16);
         noStroke();
         fill(255, 255, 255);
-        text("Step: " + Math.round(percent * longestPath), 0, CANVAS_SIZE + 10);
+        text("Step: " + Math.round(percent * longestPath) + " / " + longestPath, 0, CANVAS_SIZE + 10);
         pop();
         pop();
-    };
-    Grid.DEPTH = 16;
-    Grid.FRAMES = 10;
-    return Grid;
-}());
-var Pos = (function () {
-    function Pos(x, y) {
+    }
+}
+Grid.DEPTH = 16;
+Grid.FRAMES = 10;
+class Pos {
+    constructor(x, y) {
         this.X = x;
         this.Y = y;
     }
-    Pos.prototype.Equals = function (pos) {
+    Equals(pos) {
+        if (!pos)
+            return false;
         return this.X == pos.X && this.Y == pos.Y;
-    };
-    Pos.prototype.Neighbors = function () {
-        return [this.Up(), this.Down(), this.Left(), this.Right()];
-    };
-    Pos.prototype.Up = function () {
+    }
+    Neighbors() {
+        return [this.Up(), this.Left(), this.Right(), this.Down()];
+    }
+    Up() {
         return new Pos(this.X, this.Y - 1);
-    };
-    Pos.prototype.Down = function () {
+    }
+    Down() {
         return new Pos(this.X, this.Y + 1);
-    };
-    Pos.prototype.Left = function () {
+    }
+    Left() {
         return new Pos(this.X - 1, this.Y);
-    };
-    Pos.prototype.Right = function () {
+    }
+    Right() {
         return new Pos(this.X + 1, this.Y);
-    };
-    Pos.prototype.GetKey = function () {
-        return this.X + "-" + this.Y;
-    };
-    return Pos;
-}());
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = function (d, b) {
-        extendStatics = Object.setPrototypeOf ||
-            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-        return extendStatics(d, b);
-    };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-var NodePos = (function (_super) {
-    __extends(NodePos, _super);
-    function NodePos(pos, step) {
-        var _this = _super.call(this, pos.X, pos.Y) || this;
-        _this.G = Number.POSITIVE_INFINITY;
-        _this.H = Number.POSITIVE_INFINITY;
-        _this.Step = step;
-        return _this;
     }
-    Object.defineProperty(NodePos.prototype, "F", {
-        get: function () {
-            return this.G + this.H;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    NodePos.prototype.GetNodeKey = function () {
-        return this.X + "-" + this.Y + "-" + this.Step;
-    };
-    return NodePos;
-}(Pos));
-var Neighbor = (function (_super) {
-    __extends(Neighbor, _super);
-    function Neighbor(pos, score) {
-        var _this = _super.call(this, pos.X, pos.Y) || this;
-        _this.Score = score;
-        return _this;
+    GetKey() {
+        return `${this.X}-${this.Y}`;
     }
-    return Neighbor;
-}(Pos));
-var INIT_STATE = "\n##############\n#B....d##A####\n###..###c...a#\n#....######C##\n#D#...b#######\n#########.####\n#...G#eF...Ef#\n#.H###########\n#..h..g#..j..#\n########.###.#\n##.####i.K#k.#\n#m.lLM######I#\n##############\n";
-var ROOT_GRID = new Grid(INIT_STATE);
-var RENDERER;
-var TIME_SLIDER;
-var CANVAS_SIZE = 0;
+}
+class NodePos extends Pos {
+    constructor(pos) {
+        super(pos.X, pos.Y);
+        this.G = Number.POSITIVE_INFINITY;
+        this.H = Number.POSITIVE_INFINITY;
+    }
+    get F() {
+        return this.G + this.H;
+    }
+    static GetNodeKey(pos) {
+        return `${pos.X}-${pos.Y}`;
+    }
+}
+class Neighbor extends Pos {
+    constructor(pos, score) {
+        super(pos.X, pos.Y);
+        this.Score = score;
+    }
+}
+class State {
+    constructor() {
+        this.CoopPath = [];
+        this.CurrentPos = {};
+        this.FinishedAgents = {};
+    }
+    Push() {
+        const step = {};
+        for (const id in this.CurrentPos)
+            step[id] = this.CurrentPos[id];
+        this.CoopPath.push(step);
+    }
+    PushFromState(state) {
+        for (const stateStep of state.CoopPath) {
+            const step = {};
+            for (const id in stateStep)
+                step[id] = stateStep[id];
+            this.CoopPath.push(step);
+        }
+        this.CurrentPos = state.CurrentPos;
+    }
+    PushFromStateReverse(state, agentId1, agentId2) {
+        for (let i = state.CoopPath.length - 1; 0 <= i; i--) {
+            const stateStep = state.CoopPath[i];
+            const step = {};
+            for (const id in stateStep) {
+                if (id == agentId1.toString())
+                    step[id] = stateStep[agentId2];
+                else if (id == agentId2.toString())
+                    step[id] = stateStep[agentId1];
+                else
+                    step[id] = stateStep[id];
+            }
+            this.CoopPath.push(step);
+            const copy = {};
+            for (const id in step)
+                copy[id] = step[id];
+            this.CurrentPos = copy;
+        }
+    }
+    GetAgentPos(agent) {
+        return this.CurrentPos[agent.Id];
+    }
+    GetAgentIdAtPos(pos) {
+        for (const id in this.CurrentPos)
+            if (this.CurrentPos[id].Equals(pos))
+                return id;
+        return false;
+    }
+    GetFinishedPositions() {
+        return Object.values(this.FinishedAgents);
+    }
+    GetCurrentPosShallowCopy() {
+        const copy = {};
+        for (const id in this.CurrentPos)
+            copy[id] = this.CurrentPos[id];
+        return copy;
+    }
+}
+const INIT_STATE = `
+#####################
+#B....d##A####n######
+###..###c...a#oQ.N###
+#....######C###.#.###
+#D#...b########O.Pp##
+#########.########q##
+#...G#eF...Ef#...####
+#.H###########.#.####
+#..h..g#..j..#...####
+########.###.###..###
+##.####i.K#k.####...#
+#m.lLM######I####.#.#
+#################...#
+#####################
+`;
+const ROOT_GRID = new Grid(INIT_STATE);
+ROOT_GRID.AddAgent("Connector1", 14, 6, 19, 12);
+ROOT_GRID.AddAgent("Connector2", 15, 6, 17, 10);
+ROOT_GRID.AddAgent("Connector3", 14, 7, 17, 9);
+ROOT_GRID.AddAgent("Connector4", 19, 12, 14, 6);
+ROOT_GRID.AddAgent("Connector5", 18, 12, 16, 8);
+ROOT_GRID.AddAgent("Connector6", 19, 11, 16, 9);
+ROOT_GRID.Calculate();
+let RENDERER;
+let TIME_SLIDER;
+let CANVAS_SIZE = 0;
 function setup() {
     RENDERER = createCanvas(windowWidth, windowHeight);
     TIME_SLIDER = createSlider(0, 100, 0, 0.01);
@@ -423,13 +626,13 @@ function windowResized() {
 }
 function calculateSizes() {
     CANVAS_SIZE = Math.min(windowWidth - 20, windowHeight - 70);
-    var cellSize = Math.min(CANVAS_SIZE / ROOT_GRID.Width, CANVAS_SIZE / ROOT_GRID.Height);
+    const cellSize = Math.min(CANVAS_SIZE / ROOT_GRID.Width, CANVAS_SIZE / ROOT_GRID.Height);
     ROOT_GRID.CellWidth = cellSize;
     ROOT_GRID.CellHeight = cellSize;
     ROOT_GRID.PosX = windowWidth / 2 - CANVAS_SIZE / 2;
     ROOT_GRID.PosY = (windowHeight - 50) / 2 - CANVAS_SIZE / 2;
     TIME_SLIDER.position(ROOT_GRID.PosX, ROOT_GRID.PosY + CANVAS_SIZE + 30);
-    TIME_SLIDER.style("width", CANVAS_SIZE + "px");
+    TIME_SLIDER.style("width", `${CANVAS_SIZE}px`);
 }
 function mouseClicked() {
     ROOT_GRID.OnMouseClick(mouseX, mouseY);
@@ -439,7 +642,7 @@ function mouseMoved() {
 }
 function draw() {
     background(0);
-    var timerValue = TIME_SLIDER.value();
+    const timerValue = TIME_SLIDER.value();
     ROOT_GRID.Render(typeof timerValue === "number" ? timerValue / 100 : 0);
 }
 //# sourceMappingURL=build.js.map

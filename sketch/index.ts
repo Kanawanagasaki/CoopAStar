@@ -3,24 +3,33 @@
 /// <reference path="./neighbor.ts" />
 /// <reference path="./agent.ts" />
 /// <reference path="./grid.ts" />
+/// <reference path="./state.ts" />
 
 const INIT_STATE =
 `
-##############
-#B....d##A####
-###..###c...a#
-#....######C##
-#D#...b#######
-#########.####
-#...G#eF...Ef#
-#.H###########
-#..h..g#..j..#
-########.###.#
-##.####i.K#k.#
-#m.lLM######I#
-##############
+#####################
+#B....d##A####n######
+###..###c...a#oQ.N###
+#....######C###.#.###
+#D#...b########O.Pp##
+#########.########q##
+#...G#eF...Ef#...####
+#.H###########.#.####
+#..h..g#..j..#...####
+########.###.###..###
+##.####i.K#k.####...#
+#m.lLM######I####.#.#
+#################...#
+#####################
 `;
 const ROOT_GRID = new Grid(INIT_STATE);
+ROOT_GRID.AddAgent("Connector1", 14, 6, 19, 12);
+ROOT_GRID.AddAgent("Connector2", 15, 6, 17, 10);
+ROOT_GRID.AddAgent("Connector3", 14, 7, 17, 9);
+ROOT_GRID.AddAgent("Connector4", 19, 12, 14, 6);
+ROOT_GRID.AddAgent("Connector5", 18, 12, 16, 8);
+ROOT_GRID.AddAgent("Connector6", 19, 11, 16, 9);
+ROOT_GRID.Calculate();
 let RENDERER: p5.Renderer;
 let TIME_SLIDER: p5.Element;
 let CANVAS_SIZE: number = 0;

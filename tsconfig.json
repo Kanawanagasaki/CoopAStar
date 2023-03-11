@@ -7,7 +7,7 @@
     "removeComments": true,
     "rootDir": "./sketch/",
     "sourceMap": true,
-    "target": "es5",
+    "target": "ESNext",
     "moduleResolution": "node"
   }
 }

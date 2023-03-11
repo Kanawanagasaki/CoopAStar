@@ -8,11 +8,12 @@ class Pos {
     }
 
     public Equals(pos: Pos) {
+        if (!pos) return false;
         return this.X == pos.X && this.Y == pos.Y;
     }
 
     public Neighbors() {
-        return [this.Up(), this.Down(), this.Left(), this.Right()];
+        return [this.Up(), this.Left(), this.Right(), this.Down()];
     }
 
     public Up() {
