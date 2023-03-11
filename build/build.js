@@ -361,8 +361,10 @@ class Grid {
             const agentToMove = this.AgentsIs[agentIdToMove];
             const tempState = new State();
             tempState.CurrentPos = state.GetCurrentPosShallowCopy();
-            this.Push(tempState, agent1, vertexBack, []);
-            this.Push(tempState, agentToMove, emptyVertices[0], []);
+            if (!this.Push(tempState, agent1, vertexBack, []))
+                return false;
+            if (!this.Push(tempState, agentToMove, emptyVertices[0], []))
+                return false;
             tempState.CurrentPos[agent1.Id] = vertex;
             tempState.CurrentPos[agent2.Id] = vertexBack;
             tempState.Push();
@@ -615,14 +617,28 @@ class State {
     }
 }
 const INIT_STATE = `
-########
-##..j..#
-##.###.#
-#i.K#k.#
-######I#
-########
+#####################
+#B....d##A####n######
+###..###c...a#oQ.N###
+#....######C###.#.###
+#D#...b########O.Pp##
+#########.########q##
+#...G#eF...Ef#...####
+#.H###########.#.####
+#..h..g#..j..#...####
+########.###.###..###
+##.####i.K#k.####...#
+#m.lLM######I####.#.#
+#################...#
+#####################
 `;
 const ROOT_GRID = new Grid(INIT_STATE);
+ROOT_GRID.AddAgent("Connector1", 14, 6, 19, 12);
+ROOT_GRID.AddAgent("Connector2", 15, 6, 17, 10);
+ROOT_GRID.AddAgent("Connector3", 14, 7, 17, 9);
+ROOT_GRID.AddAgent("Connector4", 19, 12, 14, 6);
+ROOT_GRID.AddAgent("Connector5", 18, 12, 16, 8);
+ROOT_GRID.AddAgent("Connector6", 19, 11, 16, 9);
 ROOT_GRID.Calculate();
 let RENDERER;
 let TIME_SLIDER;

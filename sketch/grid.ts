@@ -304,8 +304,10 @@ class Grid {
             const agentToMove = this.AgentsIs[agentIdToMove];
             const tempState = new State();
             tempState.CurrentPos = state.GetCurrentPosShallowCopy();
-            this.Push(tempState, agent1, vertexBack, []);
-            this.Push(tempState, agentToMove, emptyVertices[0], []);
+            if (!this.Push(tempState, agent1, vertexBack, []))
+                return false;
+            if (!this.Push(tempState, agentToMove, emptyVertices[0], []))
+                return false;
             tempState.CurrentPos[agent1.Id] = vertex;
             tempState.CurrentPos[agent2.Id] = vertexBack;
             tempState.Push();
