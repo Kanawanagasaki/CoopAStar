@@ -50,7 +50,7 @@ const goals: Pos[] = JSON.parse(JSON.stringify(cells));
 cells.sort((a, b) => (Math.random() > .5) ? 1 : -1);
 goals.sort((a, b) => (Math.random() > .5) ? 1 : -1);
 let randomAgentNum = 0;
-while (cells.length > 2 && goals.length > 2) {
+while (cells.length > 3 && goals.length > 3) {
     const start = cells.shift();
     const goal = goals.shift();
     ROOT_GRID.AddAgent("Random" + (++randomAgentNum), start.X, start.Y, goal.X, goal.Y);
