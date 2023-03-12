@@ -45,12 +45,11 @@ class Agent {
             this._openSet.sort((a, b) => a.F - b.F);
             let current = this._openSet.shift();
             this._closedSet[current.GetNodeKey()] = current;
-            if (current.X == this.Goal.X && current.Y == this.Goal.Y) {
+            if (current.Equals(this.Goal)) {
                 while (current) {
                     this.Path.unshift(current);
                     current = current.PrevNode;
                 }
-                console.log(this._closedSet);
                 return true;
             }
 
@@ -63,12 +62,16 @@ class Agent {
                 const tentativeNode = new NodePos(neighbor);
                 tentativeNode.G = current.G + neighbor.Score;
                 const nodeKey = tentativeNode.GetNodeKey();
-                if (!(nodeKey in this._closedSet) || tentativeNode.G < this._closedSet[nodeKey].G) {
+                if (this._closedSet.hasOwnProperty(nodeKey)) {
+                    if (tentativeNode.G < this._closedSet[nodeKey].G) {
+                        this._closedSet[nodeKey].G = tentativeNode.G;
+                        this._closedSet[nodeKey].PrevNode = current;
+                    }
+                }
+                else {
                     tentativeNode.PrevNode = current;
                     tentativeNode.H = dist(tentativeNode, this.Goal);
-                    this._closedSet[nodeKey] = tentativeNode;
-                    if (!this._openSet.some(x => x.Equals(tentativeNode)))
-                        this._openSet.push(tentativeNode);
+                    this._openSet.push(tentativeNode);
                 }
             }
         }

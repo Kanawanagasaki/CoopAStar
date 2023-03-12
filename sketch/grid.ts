@@ -40,11 +40,30 @@ class Grid {
         for (const agent of this.Agents)
             if (!agent.Goal)
                 agent.Goal = agent.Start;
+    }
 
+    public AddAgent(name: string, startX: number, startY: number, goalX: number, goalY: number) {
+        if (this.IsWall(new Pos(startX, startY)))
+            throw new Error("You tried to spawn agent " + name + " in wall");
+        if (this.IsWall(new Pos(goalX, goalY)))
+            throw new Error("You tried to set goal for agent " + name + " in wall");
+
+        for (const a of this.Agents) {
+            if (a.Start.X == startX && a.Start.Y == startY)
+                throw new Error("Start position conflict between " + a.Name + " and " + name);
+            if (a.Goal.X == goalX && a.Goal.Y == goalY)
+                throw new Error("Goal position conflict between " + a.Name + " and " + name);
+        }
+
+        const agent = new Agent(this, name, startX, startY);
+        agent.Goal = new Pos(goalX, goalY);
+        this.Agents.push(agent);
+    }
+
+    public Calculate() {
         for (const agent of this.Agents)
             agent.CalculatePath();
 
-            
         for (const agent of this.Agents)
             agent.Summarize();
     }

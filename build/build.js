@@ -27,12 +27,11 @@ class Agent {
             this._openSet.sort((a, b) => a.F - b.F);
             let current = this._openSet.shift();
             this._closedSet[current.GetNodeKey()] = current;
-            if (current.X == this.Goal.X && current.Y == this.Goal.Y) {
+            if (current.Equals(this.Goal)) {
                 while (current) {
                     this.Path.unshift(current);
                     current = current.PrevNode;
                 }
-                console.log(this._closedSet);
                 return true;
             }
             const neighbors = [];
@@ -43,12 +42,16 @@ class Agent {
                 const tentativeNode = new NodePos(neighbor);
                 tentativeNode.G = current.G + neighbor.Score;
                 const nodeKey = tentativeNode.GetNodeKey();
-                if (!(nodeKey in this._closedSet) || tentativeNode.G < this._closedSet[nodeKey].G) {
+                if (this._closedSet.hasOwnProperty(nodeKey)) {
+                    if (tentativeNode.G < this._closedSet[nodeKey].G) {
+                        this._closedSet[nodeKey].G = tentativeNode.G;
+                        this._closedSet[nodeKey].PrevNode = current;
+                    }
+                }
+                else {
                     tentativeNode.PrevNode = current;
                     tentativeNode.H = dist(tentativeNode, this.Goal);
-                    this._closedSet[nodeKey] = tentativeNode;
-                    if (!this._openSet.some(x => x.Equals(tentativeNode)))
-                        this._openSet.push(tentativeNode);
+                    this._openSet.push(tentativeNode);
                 }
             }
         }
@@ -160,6 +163,23 @@ class Grid {
         for (const agent of this.Agents)
             if (!agent.Goal)
                 agent.Goal = agent.Start;
+    }
+    AddAgent(name, startX, startY, goalX, goalY) {
+        if (this.IsWall(new Pos(startX, startY)))
+            throw new Error("You tried to spawn agent " + name + " in wall");
+        if (this.IsWall(new Pos(goalX, goalY)))
+            throw new Error("You tried to set goal for agent " + name + " in wall");
+        for (const a of this.Agents) {
+            if (a.Start.X == startX && a.Start.Y == startY)
+                throw new Error("Start position conflict between " + a.Name + " and " + name);
+            if (a.Goal.X == goalX && a.Goal.Y == goalY)
+                throw new Error("Goal position conflict between " + a.Name + " and " + name);
+        }
+        const agent = new Agent(this, name, startX, startY);
+        agent.Goal = new Pos(goalX, goalY);
+        this.Agents.push(agent);
+    }
+    Calculate() {
         for (const agent of this.Agents)
             agent.CalculatePath();
         for (const agent of this.Agents)
@@ -274,21 +294,53 @@ class Neighbor extends Pos {
     }
 }
 const INIT_STATE = `
-##############
-#B....d##A####
-###..###c...a#
-#....######C##
-#D#...b#######
-#########.####
-#...G#eF...Ef#
-#.H###########
-#..h..g#..j..#
-########.###.#
-##.####i.K#k.#
-#m.lLM######I#
-##############
+#####################
+#B....d##A####n######
+###..###c...a#oQ.N###
+#....######C###.#.###
+#D#...b########O.Ppq#
+#########.###########
+#...G#eF...Ef#...##z#
+#.H###########.#.#.y#
+#..h..g#..j..#...##Z#
+########.###.###..###
+##.####i.K#k.####...#
+#m.lLM######I####.#.#
+#######.#########...#
+#uvwx.T.##.#....#####
+#R#####V##.#........#
+#X#####S##.#####....#
+#WsU.tr.#......#....#
+#####################
 `;
 const ROOT_GRID = new Grid(INIT_STATE);
+ROOT_GRID.AddAgent("Connector1", 14, 6, 19, 12);
+ROOT_GRID.AddAgent("Connector2", 15, 6, 17, 10);
+ROOT_GRID.AddAgent("Connector3", 14, 7, 17, 9);
+ROOT_GRID.AddAgent("Connector4", 19, 12, 14, 6);
+ROOT_GRID.AddAgent("Connector5", 18, 12, 16, 8);
+ROOT_GRID.AddAgent("Connector6", 19, 11, 16, 9);
+ROOT_GRID.AddAgent("Tunnel1", 14, 16, 11, 16);
+ROOT_GRID.AddAgent("Tunnel2", 13, 16, 12, 16);
+ROOT_GRID.AddAgent("Tunnel3", 12, 16, 13, 16);
+ROOT_GRID.AddAgent("Tunnel4", 10, 16, 14, 16);
+const cells = [];
+for (let iy = 13; iy <= 14; iy++)
+    for (let ix = 12; ix <= 15; ix++)
+        cells.push(new Pos(ix, iy));
+for (let iy = 14; iy <= 16; iy++)
+    for (let ix = 16; ix <= 19; ix++)
+        cells.push(new Pos(ix, iy));
+const goals = JSON.parse(JSON.stringify(cells));
+cells.sort((a, b) => (Math.random() > .5) ? 1 : -1);
+goals.sort((a, b) => (Math.random() > .5) ? 1 : -1);
+let randomAgentNum = 0;
+while (cells.length > 2 && goals.length > 2) {
+    const start = cells.shift();
+    const goal = goals.shift();
+    ROOT_GRID.AddAgent("Random" + (++randomAgentNum), start.X, start.Y, goal.X, goal.Y);
+}
+ROOT_GRID.Calculate();
 let RENDERER;
 let TIME_SLIDER;
 let CANVAS_SIZE = 0;
