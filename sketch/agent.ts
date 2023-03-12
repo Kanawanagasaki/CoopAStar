@@ -69,13 +69,19 @@ class Agent {
             for (const neighbor of neighborNodes) {
                 const tentativeNode = new NodePos(neighbor, current.Step + 1);
                 tentativeNode.G = current.G + neighbor.Score;
+                tentativeNode.PrevNode = current;
                 const nodeKey = isCoop ? tentativeNode.GetNodeKey() : tentativeNode.GetKey();
-                if (!(nodeKey in closedSet) || tentativeNode.G < closedSet[nodeKey].G) {
-                    tentativeNode.PrevNode = current;
+                if (closedSet.hasOwnProperty(nodeKey)) {
+                    if (tentativeNode.G < closedSet[nodeKey].G) {
+                        closedSet[nodeKey].G = tentativeNode.G;
+                        closedSet[nodeKey].H = tentativeNode.H;
+                        closedSet[nodeKey].Step = tentativeNode.Step;
+                        closedSet[nodeKey].PrevNode = tentativeNode.PrevNode;
+                    }
+                }
+                else {
                     tentativeNode.H = dist(tentativeNode, this.Goal);
-                    closedSet[nodeKey] = tentativeNode;
-                    if (!openSet.some(x => x.Equals(tentativeNode) && (x.Step == tentativeNode.Step || !isCoop)))
-                        openSet.push(tentativeNode);
+                    openSet.push(tentativeNode);
                 }
             }
         }

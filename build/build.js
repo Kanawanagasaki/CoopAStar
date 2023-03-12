@@ -48,22 +48,24 @@ var Agent = (function () {
             }
             if (isCoop && !this.Grid.IsAgent(this, current, current.Step + 1, false))
                 neighborNodes.push(new Neighbor(current, 1));
-            var _loop_1 = function (neighbor) {
-                var tentativeNode = new NodePos(neighbor, current.Step + 1);
-                tentativeNode.G = current.G + neighbor.Score;
-                var nodeKey = isCoop ? tentativeNode.GetNodeKey() : tentativeNode.GetKey();
-                if (!(nodeKey in closedSet) || tentativeNode.G < closedSet[nodeKey].G) {
-                    tentativeNode.PrevNode = current;
-                    tentativeNode.H = dist(tentativeNode, this_1.Goal);
-                    closedSet[nodeKey] = tentativeNode;
-                    if (!openSet.some(function (x) { return x.Equals(tentativeNode) && (x.Step == tentativeNode.Step || !isCoop); }))
-                        openSet.push(tentativeNode);
-                }
-            };
-            var this_1 = this;
             for (var _b = 0, neighborNodes_1 = neighborNodes; _b < neighborNodes_1.length; _b++) {
                 var neighbor = neighborNodes_1[_b];
-                _loop_1(neighbor);
+                var tentativeNode = new NodePos(neighbor, current.Step + 1);
+                tentativeNode.G = current.G + neighbor.Score;
+                tentativeNode.PrevNode = current;
+                var nodeKey = isCoop ? tentativeNode.GetNodeKey() : tentativeNode.GetKey();
+                if (closedSet.hasOwnProperty(nodeKey)) {
+                    if (tentativeNode.G < closedSet[nodeKey].G) {
+                        closedSet[nodeKey].G = tentativeNode.G;
+                        closedSet[nodeKey].H = tentativeNode.H;
+                        closedSet[nodeKey].Step = tentativeNode.Step;
+                        closedSet[nodeKey].PrevNode = tentativeNode.PrevNode;
+                    }
+                }
+                else {
+                    tentativeNode.H = dist(tentativeNode, this.Goal);
+                    openSet.push(tentativeNode);
+                }
             }
         }
         return false;
@@ -142,44 +144,62 @@ var Grid = (function () {
         for (var iy = 0; iy < lines.length; iy++) {
             this[iy] = [];
             var chs = lines[iy].split("");
-            var _loop_2 = function (ix) {
-                this_2[iy][ix] = chs[ix] != "#";
+            var _loop_1 = function (ix) {
+                this_1[iy][ix] = chs[ix] != "#";
                 if (/[a-z]/.test(chs[ix])) {
-                    var agent = new Agent(this_2, chs[ix], ix, iy);
+                    var agent = new Agent(this_1, chs[ix], ix, iy);
                     if (chs[ix] in goals)
                         agent.Goal = goals[chs[ix]];
-                    this_2.Agents.push(agent);
+                    this_1.Agents.push(agent);
                 }
                 else if (/[A-Z]/.test(chs[ix])) {
                     var name_1 = chs[ix].toLowerCase();
-                    var agent = this_2.Agents.filter(function (x) { return x.Name == name_1; })[0];
+                    var agent = this_1.Agents.filter(function (x) { return x.Name == name_1; })[0];
                     if (agent)
                         agent.Goal = new Pos(ix, iy);
                     else
                         goals[name_1] = new Pos(ix, iy);
                 }
             };
-            var this_2 = this;
+            var this_1 = this;
             for (var ix = 0; ix < chs.length; ix++) {
-                _loop_2(ix);
+                _loop_1(ix);
             }
             this.Width = Math.max(this.Width, chs.length);
         }
+        this.Height = lines.length;
         for (var _i = 0, _a = this.Agents; _i < _a.length; _i++) {
             var agent = _a[_i];
             if (!agent.Goal)
                 agent.Goal = agent.Start;
         }
-        for (var _b = 0, _c = this.Agents; _b < _c.length; _b++) {
-            var agent = _c[_b];
+    }
+    Grid.prototype.AddAgent = function (name, startX, startY, goalX, goalY) {
+        if (this.IsWall(new Pos(startX, startY)))
+            throw new Error("You tried to spawn agent " + name + " in wall");
+        if (this.IsWall(new Pos(goalX, goalY)))
+            throw new Error("You tried to set goal for agent " + name + " in wall");
+        for (var _i = 0, _a = this.Agents; _i < _a.length; _i++) {
+            var a = _a[_i];
+            if (a.Start.X == startX && a.Start.Y == startY)
+                throw new Error("Start position conflict between " + a.Name + " and " + name);
+            if (a.Goal.X == goalX && a.Goal.Y == goalY)
+                throw new Error("Goal position conflict between " + a.Name + " and " + name);
+        }
+        var agent = new Agent(this, name, startX, startY);
+        agent.Goal = new Pos(goalX, goalY);
+        this.Agents.push(agent);
+    };
+    Grid.prototype.Calculate = function () {
+        for (var _i = 0, _a = this.Agents; _i < _a.length; _i++) {
+            var agent = _a[_i];
             agent.CalculatePath(true, true);
         }
-        for (var _d = 0, _e = this.Agents; _d < _e.length; _d++) {
-            var agent = _e[_d];
+        for (var _b = 0, _c = this.Agents; _b < _c.length; _b++) {
+            var agent = _c[_b];
             agent.Summarize();
         }
-        this.Height = lines.length;
-    }
+    };
     Grid.prototype.IsWall = function (pos) {
         return !this.hasOwnProperty(pos.Y) || !this[pos.Y][pos.X];
     };
@@ -324,8 +344,35 @@ var Neighbor = (function (_super) {
     }
     return Neighbor;
 }(Pos));
-var INIT_STATE = "\n##############\n#B....d##A####\n###..###c...a#\n#....######C##\n#D#...b#######\n#########.####\n#...G#eF...Ef#\n#.H###########\n#..h..g#..j..#\n########.###.#\n##.####i.K#k.#\n#m.lLM######I#\n##############\n";
+var INIT_STATE = "\n#####################\n#B....d##A####n######\n###..###c...a#oQ.N###\n#....######C###.#.###\n#D#...b########O.Ppq#\n#########.###########\n#...G#eF...Ef#...##z#\n#.H###########.#.#.y#\n#..h..g#..j..#...##Z#\n########.###.###..###\n##.####i.K#k.####...#\n#m.lLM######I####.#.#\n#######.#########...#\n#uvwx.T.##.#....#####\n#R#####V##.#........#\n#X#####S##.#####....#\n#WsU.tr.#......#....#\n#####################\n";
 var ROOT_GRID = new Grid(INIT_STATE);
+ROOT_GRID.AddAgent("Connector1", 14, 6, 19, 12);
+ROOT_GRID.AddAgent("Connector2", 15, 6, 17, 10);
+ROOT_GRID.AddAgent("Connector3", 14, 7, 17, 9);
+ROOT_GRID.AddAgent("Connector4", 19, 12, 14, 6);
+ROOT_GRID.AddAgent("Connector5", 18, 12, 16, 8);
+ROOT_GRID.AddAgent("Connector6", 19, 11, 16, 9);
+ROOT_GRID.AddAgent("Tunnel1", 14, 16, 11, 16);
+ROOT_GRID.AddAgent("Tunnel2", 13, 16, 12, 16);
+ROOT_GRID.AddAgent("Tunnel3", 12, 16, 13, 16);
+ROOT_GRID.AddAgent("Tunnel4", 10, 16, 14, 16);
+var cells = [];
+for (var iy = 13; iy <= 14; iy++)
+    for (var ix = 12; ix <= 15; ix++)
+        cells.push(new Pos(ix, iy));
+for (var iy = 14; iy <= 16; iy++)
+    for (var ix = 16; ix <= 19; ix++)
+        cells.push(new Pos(ix, iy));
+var goals = JSON.parse(JSON.stringify(cells));
+cells.sort(function (a, b) { return (Math.random() > .5) ? 1 : -1; });
+goals.sort(function (a, b) { return (Math.random() > .5) ? 1 : -1; });
+var randomAgentNum = 0;
+while (cells.length > 3 && goals.length > 3) {
+    var start = cells.shift();
+    var goal = goals.shift();
+    ROOT_GRID.AddAgent("Random" + (++randomAgentNum), start.X, start.Y, goal.X, goal.Y);
+}
+ROOT_GRID.Calculate();
 var RENDERER;
 var TIME_SLIDER;
 var CANVAS_SIZE = 0;
